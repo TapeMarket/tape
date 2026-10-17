@@ -2,12 +2,13 @@ import { TriggerEditor } from "./Triggers";
 import { share, shareTrade, ShareButton } from "./Share";
 import { useEffect, useState, type ReactNode } from "react";
 import { keepShare, quoteClose, sizeLevel } from "@shared/math.mjs";
-import { closePosition, closingIntent, isLive } from "../lib/actions";
+import { checkOpenSubmission, closePosition, closingIntent } from "../lib/actions";
 import { ago, big, coin as coinText, dateTime, duration, percent, price, shortAddress, usd } from "../lib/format";
 import { PREVIEW } from "../lib/mode";
 import { getState, serverNow, setState, useStore } from "../lib/store";
 import type { Emission, Intent, Market, Position, QueueClaim, QueueEntry, StakingEntry, Trade, Transfer } from "../lib/types";
 import { AssetIcon } from "./Shell";
+import { pendingOpens, type PendingOpen } from "../lib/open-orders";
 
 const EMPTY_POSITIONS: Position[] = [];
 const NO_MARKETS: Market[] = [];
@@ -119,6 +120,33 @@ export function Table({ head, children, empty, sorting }: { head: (string | [str
 // Open positions
 // ---------------------------------------------------------------------------------------------
 
+function usePendingOpens(now: number) {
+  const owner = useStore(s => s.owner), account = useStore(s => s.account), history = useStore(s => s.history);
+  const intents = useStore(s => s.intents), openSubmissions = useStore(s => s.openSubmissions);
+  return pendingOpens({ owner, account, history, intents, openSubmissions }, now);
+}
+
+function OpenStatus({ order, now }: { order: PendingOpen; now: number }) {
+  useEffect(() => {
+    if (order.stage !== "checking" || !order.submissionId) return;
+    const id = order.submissionId;
+    const check = () => { if (!document.hidden) void checkOpenSubmission(id); };
+    check();
+    const timer = setInterval(check, 3000);
+    document.addEventListener("visibilitychange", check);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", check); };
+  }, [order.stage, order.submissionId]);
+  return <span className="open-status" role="status"><b>{order.stage === "sending" ? "Sending order" : order.stage === "checking" ? "Checking order" : order.stage === "confirming" ? "Price set" : "Waiting for price"}</b><small>{order.stage === "sending" ? "Waiting for acceptance" : order.stage === "checking" ? "Response interrupted. Verifying status." : order.stage === "confirming" ? "Confirming on Ethereum" : order.pinTime && order.pinTime > now ? `Price window in ${order.pinTime - now}s` : "Waiting for the first eligible price"}</small></span>;
+}
+
+function OpeningStrip({ order, markets, now }: { order: PendingOpen; markets: Market[]; now: number }) {
+  const request = order.order, market = request && markets.find(m => m.id === request.market);
+  return <article className="strip opening-order" aria-label={market && request ? `${market.symbol} ${request.isLong ? "long" : "short"} order` : "Opening order"}>
+    {request && market && <><div className="strip-id"><Asset market={market} /><Side isLong={request.isLong} /><span className="strip-lev">{request.leverage}x</span></div><div className="strip-cell"><small>Size</small><span>{usd(BigInt(request.margin) * BigInt(request.leverage), { cents: false })}</span></div><div className="strip-cell"><small>Margin</small><span>{usd(request.margin)}</span></div></>}
+    <OpenStatus order={order} now={now} />
+  </article>;
+}
+
 function PositionRow({ position, market, closing }: { position: Position; market: Market; closing: Intent | null }) {
   const tick = useStore((s) => s.ticks[position.market]);
   const [sending, setSending] = useState(false);
@@ -153,6 +181,7 @@ function PositionRow({ position, market, closing }: { position: Position; market
     <tr>
       <td>
         <Asset market={market} />
+        {position.status === "pending" && <small className="strip-confirmation">Confirming on Ethereum</small>}
       </td>
       <td>
         <Side isLong={position.isLong} />
@@ -194,8 +223,7 @@ export function PositionsTable() {
   const markets = useStore((s) => s.config?.markets) ?? NO_MARKETS;
   const now = useSecond();
   // Orders signed and waiting for their price show up before the position exists.
-  const held = new Set(positions.map((p) => p.id));
-  const filling = Object.values(intents).filter((i) => i.kind === "open" && i.status === "accepted" && isLive(i, now) && !held.has(i.positionId));
+  const filling = usePendingOpens(now);
   const newestFirst = [...positions].sort((a, b) => b.entryTime - a.entryTime);
   const livePnl = (p: Position) => {
     const mark = getState().ticks[p.market]?.p;
@@ -229,13 +257,7 @@ export function PositionsTable() {
       }
     >
       {[
-        ...filling.map((intent) => (
-          <tr key={`filling:${intent.id}`}>
-            <td colSpan={10} className="dim">
-              Filling at the next price{intent.pinTime > now ? ` in ${intent.pinTime - now}s` : ""}
-            </td>
-          </tr>
-        )),
+        ...filling.map(order => <tr key={order.id} className="opening-order"><td colSpan={10}><OpeningStrip order={order} markets={markets} now={now} /></td></tr>),
         ...rows.map((p) => <PositionRow key={p.id} position={p} market={markets[p.market]} closing={closingIntent(intents, p.id, now)} />),
       ]}
     </Table>
@@ -305,6 +327,7 @@ function PositionStrip({ position, market, closing }: { position: Position; mark
         <b>{market.symbol}</b>
         <span className={`side ${position.isLong ? "up" : "down"}`}>{position.isLong ? "Long" : "Short"}</span>
         <span className="strip-lev">{position.leverage}x</span>
+        {position.status === "pending" && <small className="strip-confirmation" role="status">Confirming on Ethereum</small>}
       </div>
       <div className="strip-cell">
         <small>Size</small>
@@ -354,8 +377,7 @@ export function PositionStrips() {
   const intents = useStore((s) => s.intents);
   const markets = useStore((s) => s.config?.markets) ?? NO_MARKETS;
   const now = useSecond();
-  const held = new Set(positions.map((p) => p.id));
-  const filling = Object.values(intents).filter((i) => i.kind === "open" && i.status === "accepted" && isLive(i, now) && !held.has(i.positionId));
+  const filling = usePendingOpens(now);
   const newestFirst = [...positions].sort((a, b) => b.entryTime - a.entryTime);
   if (!filling.length && !newestFirst.length) {
     return (
@@ -375,11 +397,7 @@ export function PositionStrips() {
   }
   return (
     <div className="strips">
-      {filling.map((intent) => (
-        <div key={`filling:${intent.id}`} className="strip filling">
-          Filling at the next price{intent.pinTime > now ? ` in ${intent.pinTime - now}s` : ""}
-        </div>
-      ))}
+      {filling.map(order => <OpeningStrip key={order.id} order={order} markets={markets} now={now} />)}
       {newestFirst.map((p) => (
         <PositionStrip key={p.id} position={p} market={markets[p.market]} closing={closingIntent(intents, p.id, now)} />
       ))}

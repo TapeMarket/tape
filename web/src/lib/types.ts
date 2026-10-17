@@ -146,6 +146,8 @@ export interface Intent {
   fill: { price: string; time?: number; pnl?: string; busted?: boolean } | null;
   error: string | null;
   tx: Hex | null;
+  /** Details retained locally while the server pins the real fill price. */
+  order?: import("./open-orders").OpenDetails;
 }
 
 /** A payout still waiting in the queue, and how much is owed to the people in front of it. */

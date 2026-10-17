@@ -6,6 +6,7 @@ import { API_URL, PREVIEW } from "./mode";
 import { EMPTY_HISTORY, getState, setState, toast, type Tick } from "./store";
 import type { Account, Address, CoinPayload, Config, History, HousePayload, Intent, Leaderboard, Position, SeriesPoint, Status, TapeChip, Trade, Season, JackpotPayload } from "./types";
 import { usd } from "./format";
+import { recordIntent, withoutSubmissions } from "./open-orders";
 
 export class ApiError extends Error {
   constructor(
@@ -148,17 +149,17 @@ export async function loadAccount(): Promise<void> {
   if (current?.blockNumber && account.blockNumber === current.blockNumber && balanceVersion !== accountBalanceVersion) return;
   appliedAccountRead = sequence;
   // This snapshot may be older than what the stream has already said: an order only moves forward.
-  const intents = { ...getState().intents };
+  let intents = { ...getState().intents };
+  let openSubmissions = getState().openSubmissions;
   for (const intent of account.intents) {
-    const known = intents[intent.id];
-    if (!known || STAGE[intent.status] >= STAGE[known.status]) intents[intent.id] = intent;
+    const next = recordIntent({ intents, openSubmissions }, intent);
+    intents = next.intents; openSubmissions = next.openSubmissions;
   }
   // An HTTP snapshot can reach us before the indexer catches up, then arrive after its close event.
   const closed = new Set(getState().history.trades.map(trade => trade.id));
-  setState({ account: { ...account, positions: account.positions.filter(position => !closed.has(position.id)) }, intents });
+  openSubmissions = withoutSubmissions(openSubmissions, new Set([...closed, ...account.positions.map(p => p.id)]));
+  setState({ account: { ...account, positions: account.positions.filter(position => !closed.has(position.id)) }, intents, openSubmissions });
 }
-
-const STAGE: Record<Intent["status"], number> = { accepted: 0, filled: 1, confirmed: 2, failed: 2 };
 
 /** Refetches the account shortly, coalescing bursts of events into one request. */
 export function refreshAccountSoon(ms = 120): void {
@@ -219,7 +220,7 @@ function upsertPosition(position: Position): void {
       takeProfit: "takeProfit" in position ? position.takeProfit : prev?.takeProfit,
       stopLoss: "stopLoss" in position ? position.stopLoss : prev?.stopLoss,
     };
-    return { account: { ...s.account, positions: [...rest, { ...position, ...kept }] } };
+    return { account: { ...s.account, positions: [...rest, { ...position, ...kept }] }, openSubmissions: withoutSubmissions(s.openSubmissions, new Set([position.id])) };
   });
 }
 
@@ -239,7 +240,7 @@ function onClosed(trade: Trade): void {
       if (fresh) accountBalanceVersion++;
       account = { ...account, ...(fresh ? { balance: snapshot.balance, queued: snapshot.queued, marginInUse: snapshot.marginInUse, blockNumber: snapshot.blockNumber, reserved: snapshot.reserved ?? account.reserved } : {}), positions: account.positions.filter(p => p.id !== trade.id) };
     }
-    return { account, history: { ...s.history, trades: [trade, ...s.history.trades.filter(t => t.id !== trade.id)] } };
+    return { account, history: { ...s.history, trades: [trade, ...s.history.trades.filter(t => t.id !== trade.id)] }, openSubmissions: withoutSubmissions(s.openSubmissions, new Set([trade.id])) };
   });
   if (duplicate) return;
   const symbol = getState().config?.markets[trade.market]?.symbol ?? "";
@@ -276,7 +277,8 @@ function handle(type: string, data: unknown): void {
     }
     case "intent": {
       const intent = data as Intent;
-      setState((s) => ({ intents: { ...s.intents, [intent.id]: intent } }));
+      if (getState().owner?.toLowerCase() !== intent.owner.toLowerCase()) break;
+      setState(s => recordIntent(s, intent));
       if (intent.status === "failed") toast("bad", intent.kind === "open" ? "Order not filled" : "Close failed", intent.error ?? undefined);
       if (intent.status === "confirmed" || intent.status === "failed") refreshAccountSoon();
       break;

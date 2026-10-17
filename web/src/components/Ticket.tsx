@@ -109,7 +109,7 @@ function Measure({ mark, bust, isLong, symbol }: { mark: bigint | null; bust: bi
   );
 }
 
-export function Ticket({ market }: { market: Market }) {
+export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => void }) {
   const owner = useStore((s) => s.owner);
   const account = useStore((s) => s.account);
   const ticket = useStore((s) => s.ticket);
@@ -117,6 +117,7 @@ export function Ticket({ market }: { market: Market }) {
   const config = useStore((s) => s.config)!;
   const offline = useStore((s) => s.offline);
   const session = useStore((s) => s.session);
+  const checkingOrder = useStore(s => Object.values(s.openSubmissions).some(order => order.owner.toLowerCase() === s.owner?.toLowerCase() && order.stage === "checking"));
   const now = useSecond();
   // The market as the house last reported it: how much is open on each side right now.
   const book = useStore((s) => s.house?.markets[market.id]) ?? market;
@@ -201,6 +202,7 @@ export function Ticket({ market }: { market: Market }) {
       },
     };
   } else if (activatesIn > 0) action = { label: `Trading on in ${activatesIn}s`, disabled: true };
+  else if (checkingOrder) action = { label: "Checking previous order", disabled: true };
   else if (offline) action = { label: "Offline: prices are not live", disabled: true };
   else if (!tick || now - tick.t > 6 || tick.t > now + 2) action = { label: "Waiting for live prices", disabled: true };
   else if (market.retired) action = { label: "Market retired", disabled: true };
@@ -221,6 +223,7 @@ export function Ticket({ market }: { market: Market }) {
         if (Date.now() - lastOrderAt.current < DOUBLE_CLICK_MS) return;
         lastOrderAt.current = Date.now();
         setBusy(true);
+        onOrder?.();
         const id = await openPosition({ market: market.id, isLong, margin, leverage, useQueued, impactLimit });
         if (id && withTriggers) {
           triggersOnFill(id, isLong, triggerCheck.takeProfit, triggerCheck.stopLoss);

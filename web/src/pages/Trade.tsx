@@ -11,7 +11,8 @@ import { closeAll } from "../lib/actions";
 import { loadHistory, loadHouse, loadPrices, loadStatus } from "../lib/api";
 import { ago, big, percent, price, priceNumber, usd, usdCompact, usdNumber } from "../lib/format";
 import { usePoll } from "../lib/house";
-import { setState, useStore } from "../lib/store";
+import { serverNow, setState, useStore } from "../lib/store";
+import { pendingOpens } from "../lib/open-orders";
 import type { Market, Status, TapeChip } from "../lib/types";
 import { warmCandles } from "../lib/candles";
 import { coinOf } from "../lib/hl";
@@ -267,6 +268,8 @@ export function Trade() {
   const offline = useStore((s) => s.offline);
   const trades = useStore((s) => s.history.trades);
   const open = useStore((s) => s.account?.positions.filter((p) => p.status === "open").length ?? 0);
+  const positionCount = useStore(s => s.account?.positions.length ?? 0);
+  const pendingCount = useStore(s => pendingOpens(s, serverNow()).length);
   const [step, setStep] = useState(0);
   const [tab, setTab] = useState<"positions" | "history" | "status">("positions");
   const market = markets[marketId] ?? markets[0];
@@ -307,11 +310,11 @@ export function Trade() {
         </div>
       </section>
 
-      <Ticket market={market} />
+      <Ticket market={market} onOrder={() => setTab("positions")} />
 
       <section className="tt-book" aria-label="Your positions">
         <div className="tt-book-head">
-          <PageTabs id="trade-tabs" label="Trading account" value={tab} onChange={setTab} tabs={(["positions", "history", "status"] as const).map((id) => ({ id, label: <>{id[0].toUpperCase() + id.slice(1)}{id === "positions" && owner ? <span className="count">{open}</span> : null}</> }))} />
+          <PageTabs id="trade-tabs" label="Trading account" value={tab} onChange={setTab} tabs={(["positions", "history", "status"] as const).map((id) => ({ id, label: <>{id[0].toUpperCase() + id.slice(1)}{id === "positions" && owner ? <><span className="count">{positionCount}</span>{pendingCount > 0 && <span className="count pending-count">{pendingCount} pending</span>}</> : null}</> }))} />
           <button
             className="btn small"
             disabled={open === 0 || closingAll || Boolean(offline)}

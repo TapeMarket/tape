@@ -1892,6 +1892,20 @@ p {
   color: var(--ink-3);
 }
 
+.strip.opening-order { grid-template-columns: minmax(0, 1fr) auto auto minmax(170px, 1.2fr); gap: 14px 20px; border: 1px solid var(--line-2); background: var(--tint); }
+.opening-order .strip-id { flex-wrap: wrap; }
+.opening-order .strip-cell { display: block; }
+.open-status { display: grid; gap: 4px; color: var(--ink-2); font-size: 12px; line-height: 1.4; }
+.open-status b { color: var(--blue); font-size: 12px; font-weight: 550; }
+.open-status small { margin: 0; font-size: 11px; color: var(--ink-2); }
+.strip-id:has(.strip-confirmation) { flex-wrap: wrap; }
+.strip-confirmation { flex-basis: 100%; margin: 0; color: var(--ink-2); font-size: 11px; }
+.count.pending-count { background: var(--blue-soft); color: var(--blue); white-space: nowrap; }
+@media (max-width: 720px) {
+  .strip.opening-order { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .opening-order .strip-id, .opening-order .open-status { grid-column: 1 / -1; }
+}
+
 .strip-id {
   display: flex;
   align-items: center;

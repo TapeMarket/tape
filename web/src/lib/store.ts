@@ -35,6 +35,7 @@ export interface State {
   walletName: string | null;
   account: Account | null;
   intents: Record<string, Intent>;
+  openSubmissions: Record<string, import("./open-orders").OpenSubmission>;
   history: History;
   feed: Trade[];
   tape: TapeChip[];
@@ -67,6 +68,7 @@ let state: State = {
   walletName: null,
   account: null,
   intents: {},
+  openSubmissions: {},
   history: EMPTY_HISTORY,
   feed: [],
   tape: [],

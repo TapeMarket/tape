@@ -7,7 +7,7 @@
 // In preview mode there is no chain and nothing to sign: the same requests go to the exchange
 // running in this tab, unsigned.
 
-import { getAddress, parseSignature, type Abi } from "viem";
+import { getAddress, hashTypedData, parseSignature, type Abi } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { domain as buildDomain, sessionDomain, types, permitTypes } from "@shared/eip712.mjs";
 import { ApiError, get, loadAccount, loadCoin, loadHistory, post, refreshAccountSoon } from "./api";
@@ -17,6 +17,7 @@ import { explainWalletError, getSigner } from "./wallet";
 import { checkedDepositAddress } from "./deposits";
 import { depositActive, depositCreditSince, type DepositFlow } from "./deposit-flow";
 import { withdrawActive, type WithdrawFlow } from "./withdraw-flow";
+import { INTENT_STALE_AFTER, recordIntent } from "./open-orders";
 import { pendingReferral, referralMessage, settleReferral } from "./referral";
 import { REFERRAL_CODE_RULE, referralCodeMessage } from "@shared/referral-code.mjs";
 import type { Account, Address, Hex, History, Intent } from "./types";
@@ -223,12 +224,26 @@ export interface OpenRequest {
   impactLimit: number;
 }
 
+let openSubmissionId = 0;
 /** Places an open. Resolves to the order's id, which is also the position's, or null. */
 export async function openPosition(request: OpenRequest): Promise<Hex | null> {
   const signer = getSigner();
   if (!signer) return null;
+  const owner = signer.address;
+  if (Object.values(getState().openSubmissions).some(order => order.owner.toLowerCase() === owner.toLowerCase())) return null;
+  const id = `open:${++openSubmissionId}`;
+  const order = { market: request.market, isLong: request.isLong, leverage: request.leverage, margin: request.margin.toString(), useQueued: request.useQueued };
+  let submitted = false;
+  let intentId: Hex | undefined;
+  // Paint the actual request before session signing or HTTP starts. This is not a filled position.
+  setState(s => ({ openSubmissions: { ...s.openSubmissions, [id]: { id, owner, order, stage: "sending" } } }));
+  const remove = () => setState(s => {
+    const openSubmissions = { ...s.openSubmissions }; delete openSubmissions[id];
+    return { openSubmissions };
+  });
   try {
     const intent = await withSession(async (sign) => {
+      submitted = false;
       const message = {
         owner: signer.address,
         market: request.market,
@@ -241,16 +256,64 @@ export async function openPosition(request: OpenRequest): Promise<Hex | null> {
         timestamp: stamp(),
         salt: BigInt(Math.floor(Math.random() * 2 ** 48)),
       };
-      return post<Intent>("/open", { intent: message, signature: await sign("Open", message) });
+      intentId = hashTypedData({ domain: exchangeDomain(), types, primaryType: "Open", message });
+      setState(s => ({ openSubmissions: { ...s.openSubmissions, [id]: { id, owner, order, stage: "sending", intentId } } }));
+      const signature = await sign("Open", message);
+      if (getState().owner?.toLowerCase() !== owner.toLowerCase() || getSigner()?.address.toLowerCase() !== owner.toLowerCase()) throw Error("Your wallet changed. Place the order from your connected wallet.");
+      submitted = true;
+      const response = post<Intent>("/open", { intent: message, signature });
+      if (PREVIEW) return response;
+      // The private stream can acknowledge acceptance before the HTTP response arrives.
+      // Either answer is authoritative; stop listening when the first one settles.
+      let stop = () => {};
+      const streamed = new Promise<Intent>(resolve => {
+        const check = () => {
+          const known = intentId && getState().intents[intentId];
+          if (known && known.owner.toLowerCase() === owner.toLowerCase()) resolve(known);
+        };
+        stop = subscribe(check); check();
+      });
+      try { return await Promise.race([response, streamed]); }
+      finally { stop(); }
     });
-    setState((s) => ({ intents: { ...s.intents, [intent.id]: intent } }));
+    if (intent.kind !== "open" || intent.owner.toLowerCase() !== owner.toLowerCase() || (!PREVIEW && (intent.id !== intentId || intent.positionId !== intentId))) throw Error("The order response could not be matched to your signed order.");
+    if (getState().owner?.toLowerCase() !== owner.toLowerCase()) { remove(); return null; }
+    setState(s => recordIntent(s, { ...intent, order }, id));
     // The margin is spoken for from this moment; show the balance without it right away.
     refreshAccountSoon(0);
+    if (getState().intents[intent.id]?.status === "failed") return null;
     return intent.id as Hex;
   } catch (error) {
+    if (submitted && intentId && (!(error instanceof ApiError) || error.status >= 500)) {
+      const known = getState().intents[intentId];
+      if (known && known.owner.toLowerCase() === owner.toLowerCase()) {
+        setState(s => recordIntent(s, { ...known, order }, id));
+        return known.status === "failed" ? null : intentId;
+      }
+      setState(s => ({ openSubmissions: { ...s.openSubmissions, [id]: { id, owner, order, stage: "checking", intentId } } }));
+      toast("info", "Checking your order", "The response was interrupted. Checking its status before another order is sent.");
+      return null;
+    }
+    remove();
     report("Order not placed", error);
     return null;
   }
+}
+
+const checkingOpens = new Set<string>();
+/** Read-only recovery of a submitted order; never re-signs or resends it. */
+export async function checkOpenSubmission(id: string): Promise<void> {
+  const submission = getState().openSubmissions[id];
+  if (!submission?.intentId || checkingOpens.has(id) || getState().owner?.toLowerCase() !== submission.owner.toLowerCase()) return;
+  checkingOpens.add(id);
+  try {
+    const intent = await get<Intent>(`/intent/${submission.intentId}`);
+    if (intent.kind !== "open" || intent.id !== submission.intentId || intent.owner.toLowerCase() !== submission.owner.toLowerCase() || getState().owner?.toLowerCase() !== submission.owner.toLowerCase()) return;
+    setState(s => recordIntent(s, { ...intent, order: submission.order }, id));
+    refreshAccountSoon(0);
+    if (intent.status === "failed") toast("bad", "Order not filled", intent.error ?? undefined);
+  } catch { /* Keep it unresolved rather than encourage a duplicate order. */ }
+  finally { checkingOpens.delete(id); }
 }
 
 /**
@@ -343,7 +406,7 @@ export async function closeAll(): Promise<void> {
 
 // An order lives at most this long past its price time. After that it either landed or never will,
 // so the interface stops showing it as in progress (the relayer may have restarted and lost it).
-const STALE_AFTER = 75;
+const STALE_AFTER = INTENT_STALE_AFTER;
 
 export const isLive = (intent: Intent, now: number): boolean =>
   (intent.status === "accepted" || intent.status === "filled") && now <= intent.pinTime + STALE_AFTER;
