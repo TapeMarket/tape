@@ -1,0 +1,19 @@
+{
+  // The site as static files on Cloudflare, answering on tapemarket.io. Nothing runs on the server:
+  // there is no Worker script, only the built files in dist/. Published by tools/deploy-site.sh.
+  "name": "tape",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    // An address that is no file gets 404.html, with a 404. Not the app with a 200: answering
+    // "here is the page" to a request for a script from an older build leaves that visitor with a
+    // blank page. Each real page has its own file, which tools/deploy-site.sh writes.
+    "not_found_handling": "404-page"
+  },
+  // Without this a deploy with custom domains switches the workers.dev address off.
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "tapemarket.io", "zone_name": "tapemarket.io", "custom_domain": true },
+    { "pattern": "www.tapemarket.io", "zone_name": "tapemarket.io", "custom_domain": true }
+  ]
+}

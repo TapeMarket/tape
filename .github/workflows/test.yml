@@ -1,0 +1,69 @@
+name: CI
+
+permissions: {}
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  javascript:
+    name: Frontend and relayer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - run: npm --prefix relayer ci
+      - run: npm --prefix web ci
+      - run: npm run test:relayer
+      - run: npm run test:frontend
+      - run: npm run test:installer
+      - run: node --test tools/referral-payout-state.test.mjs
+      - run: npm run build:web
+
+  contracts:
+    name: Source and deployable contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.6.0-rc1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Run Forge build
+        run: forge build
+
+      - name: Run Forge tests
+        run: forge test -vvv
+
+      # What is deployed is each contract compiled with nothing but its own imports, which for
+      # the Exchange is not always the same bytes as the project's build (README, "What gets
+      # deployed"). Build that, hold it to the size limit, and run the suite on it too.
+      - name: Build the bytecode that ships
+        run: node tools/deployable.mjs
+
+      - name: Run Forge tests on the bytecode that ships
+        run: DEPLOYABLE=true forge test

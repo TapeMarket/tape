@@ -1,0 +1,8 @@
+{
+  // Tape's design preview: the site in preview mode (play money, no relayer) on workers.dev only.
+  // Published by hand: build with VITE_PREVIEW=1, then `wrangler deploy -c wrangler.preview.jsonc`.
+  "name": "tape-preview",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./dist", "not_found_handling": "404-page" },
+  "workers_dev": true
+}

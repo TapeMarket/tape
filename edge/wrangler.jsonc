@@ -1,0 +1,11 @@
+{
+  // api.tapemarket.io: a Worker that passes requests on to the relayer's server (edge/worker.mjs).
+  // Published by tools/deploy-edge.sh, which also gives it the key it shares with the server.
+  "name": "tape-api",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "api.tapemarket.io", "custom_domain": true }]
+  // Where the relayer's server is (UPSTREAM) is not written here: tools/deploy-edge.sh hands it over
+  // when it publishes, from a file outside the repository. Only this Worker uses it; no browser does.
+}

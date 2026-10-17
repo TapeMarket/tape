@@ -1,0 +1,3 @@
+# One set of bytes on every machine. A contract's bytecode carries a hash of its sources, so the
+# same commit has to be the same files wherever it is checked out, Windows included.
+* text=auto eol=lf

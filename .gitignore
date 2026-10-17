@@ -1,0 +1,50 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+.env
+
+# Node
+node_modules/
+web/dist/
+web/e2e/shots/
+relayer/data/
+.vercel/
+.playwright-mcp/
+
+# Local deployments are rebuilt by DevDeploy; real ones are kept.
+deployments/31337*.json
+deployments/1-funding-status.json
+out-*/
+cache-*/
+# Built by tools/deployable.mjs from the sources, right before a deployment.
+deployable/
+web/dist-*/
+.wrangler/
+# The signed launch transaction of the day: single use.
+deployments/launch-*.json
+tools/out-*.html
+tools/out-*.svg
+*-readiness.log
+test-readiness.log
+
+# Local credentials and private operations
+.env.*
+!.env.example
+!web/.env.example
+!web/.env.production
+*.key
+*.pem
+keys/
+broadcast/
+deployments/*-funding*
+deployments/*-wallets*
