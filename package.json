@@ -34,6 +34,7 @@
     "test:deposit-ui": "node web/e2e/deposits.mjs",
     "test:deposit-live": "node web/e2e/deposit-live.mjs",
     "test:performance": "node web/e2e/performance.mjs",
-    "test:platform:pages": "node web/e2e/platform-pages.mjs"
+    "test:platform:pages": "node web/e2e/platform-pages.mjs",
+    "test:docs": "node web/e2e/docs.mjs"
   }
 }
