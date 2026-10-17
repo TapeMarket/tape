@@ -31,6 +31,7 @@ import { sweepable } from "./keeper.mjs";
 import { ReferralRefused } from "./referrals.mjs";
 import { createReferralCodes } from "./referral-codes.mjs";
 import { readAccountSnapshot } from "./account-balance.mjs";
+import { createSupport } from "./support.mjs";
 import { EXEC_DELAY, PIN_WINDOW, INTENT_TTL, DIRECT_DELAY, WITHDRAW_DELAY, GRACE, REQUEST_EXPIRY } from "../../shared/eip712.mjs";
 import { Rejected, toJson, acct, lower, nowSeconds, isAddr } from "./util.mjs";
 
@@ -73,6 +74,12 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
 
   const dataDir = config.dataDir ?? join(config.root, "relayer", "data");
   const namesFile = join(dataDir, `names-${config.chainId}.json`);
+  const support = config.supportAdmins?.length ? createSupport({
+    dir: config.supportDataDir ?? join(dataDir, "support"),
+    admins: config.supportAdmins,
+    verifyMessage: args => publicClient.verifyMessage(args),
+    log,
+  }).catch(error => { log.error("support: inbox unavailable", error); return null; }) : Promise.resolve(null);
   /** address (lower) -> name */
   const names = new Map();
   /** name -> address (lower) */
@@ -566,7 +573,7 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
 
   const cors = {
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type,authorization",
     "access-control-max-age": "86400",
   };
 
@@ -662,6 +669,13 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
     }
 
     if (req.method === "POST") limitPosts(clientOf(req));
+
+    if (path.startsWith("/support/")) {
+      const inbox = await support;
+      if (!inbox) throw new Rejected("Support is temporarily unavailable. Please try again shortly.", 503);
+      return inbox.handle({ req, res, path, url, client: clientOf(req), send,
+        body: req.method === "POST" ? await readBody(req) : undefined });
+    }
 
     // Test hook: only the unsigned dev price source has it, and that only runs on a local chain.
     if (req.method === "POST" && path === "/dev/nudge") {

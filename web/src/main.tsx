@@ -4,6 +4,7 @@ import "./styles/app.css";
 import { loadConfig } from "./lib/api";
 import { reloadToRecover, setState, useStore } from "./lib/store";
 import { Landing } from "./pages/Landing";
+import { Support } from "./components/Support";
 import { captureReferral } from "./lib/referral-capture";
 import { loadExchange, PATHS, preloadRoute } from "./lib/route-preload";
 
@@ -43,8 +44,8 @@ function App() {
 
   // The front page is its own screen: none of the exchange's bars around it. It does not wait for
   // the exchange's configuration either, so it is there at once.
-  if (path === "/") return <Landing />;
-  return <Suspense fallback={<div className="empty" role="status">Opening exchange…</div>}><ExchangeApp /></Suspense>;
+  if (path === "/") return <><Landing /><Support /></>;
+  return <><Suspense fallback={<div className="empty" role="status">Opening exchange…</div>}><ExchangeApp /></Suspense><Support /></>;
 }
 
 /**

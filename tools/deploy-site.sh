@@ -31,7 +31,7 @@ grep -v '^#' cloudflare.headers | sed "s#https://api.tapemarket.io#${API_ORIGIN}
 # should answer (a file apiece), so that anything else, above all a script from a build that has
 # been replaced, is a plain 404 and never the page. Keep this list in step with ROUTES in
 # web/src/lib/route-preload.ts; web/e2e/live-core.mjs checks every page on the published site.
-for page in trade jackpot portfolio vault staking leaderboard dashboard stats status docs referrals; do
+for page in trade jackpot portfolio vault staking leaderboard dashboard stats status docs referrals support; do
   cp dist/index.html "dist/${page}.html"
 done
 # What an address that is no page gets: the app, which then moves to the trade page.

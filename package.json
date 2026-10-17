@@ -34,6 +34,7 @@
     "test:deposit-ui": "node web/e2e/deposits.mjs",
     "test:withdraw-ui": "node web/e2e/withdrawals.mjs",
     "test:open-ui": "node web/e2e/opening-orders.mjs",
+    "test:support-ui": "node web/e2e/support.mjs",
     "test:deposit-live": "node web/e2e/deposit-live.mjs",
     "test:performance": "node web/e2e/performance.mjs",
     "test:platform:pages": "node web/e2e/platform-pages.mjs",

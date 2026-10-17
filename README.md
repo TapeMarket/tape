@@ -33,6 +33,18 @@ the live exchange by default; `?preview=1` opens practice mode. It has not been 
   half of every fee, plus everything the house holds above a cap. The exchange works with or
   without the coin.
 
+## Customer support
+
+The Support button opens a private conversation with the Tape team. Customers do not need a
+wallet connection. Replies arrive in the chat; the same browser can reopen its conversation.
+The chat shows the team as available only while a staff member has enabled availability and is
+actively viewing the inbox. Messages are deleted after 90 days without activity.
+
+Staff use `/support` and sign in with an authorized wallet. Set `SUPPORT_ADMINS` to a
+comma-separated list of staff wallet addresses on the relayer, and optionally set
+`SUPPORT_DATA_DIR` to its private storage directory. Sign-in needs a message signature, not a
+transaction. The inbox supports live replies, unread counts, resolution, and browser alerts.
+
 ## Deployed
 
 The Ethereum core is deployed. The public address record is

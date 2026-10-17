@@ -145,6 +145,8 @@ export function loadConfig(env = process.env) {
     hermesUrl: get("HERMES_URL", "https://hermes.pyth.network"),
     port: Number(get("PORT", "8787")),
     host: get("HOST"),
+    supportAdmins: get("SUPPORT_ADMINS", "").split(",").map(value => value.trim()).filter(Boolean),
+    supportDataDir: get("SUPPORT_DATA_DIR"),
     corsOrigin: get("CORS_ORIGIN", "*"),
     rateLimit: Number(get("RATE_LIMIT", "40")),
     depositMinUsd: Number(get("DEPOSIT_MIN_USD", chainId === 31337 ? "1" : "5")),

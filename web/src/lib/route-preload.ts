@@ -14,6 +14,7 @@ const once = (path: string, load: () => Promise<PageModule>) => () => {
 };
 
 export const PAGE_LOADERS = {
+  "/support": once("/support", () => import("../pages/SupportInbox").then(m => ({ default: m.SupportInbox }))),
   "/trade": once("/trade", () => import("../pages/Trade").then(m => ({ default: m.Trade }))),
   "/portfolio": once("/portfolio", () => import("../pages/Portfolio").then(m => ({ default: m.Portfolio }))),
   "/vault": once("/vault", () => import("../pages/Vault").then(m => ({ default: m.Vault }))),
