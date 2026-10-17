@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
-import { Dialog } from "./Shell";
+import { Dialog } from "./Dialog";
 import { deposit, depositAddress, type DepositAddress } from "../lib/actions";
 import { get, loadAccount, loadHistory } from "../lib/api";
 import { depositActive, depositAmount, depositCreditSince, type DepositFlow } from "../lib/deposit-flow";
