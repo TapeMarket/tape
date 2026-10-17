@@ -74,3 +74,14 @@ test('another wallet\'s response is never presented as an accepted order for thi
  assert.equal(Object.values(f.getState().intents).length,0);
  const pending=Object.values(f.getState().openSubmissions)[0];assert.equal(pending.owner,owner);assert.equal(pending.stage,'checking');
 });
+
+test('a full account response preserves newer fills and resolves local requests across many historical intents',async t=>{
+ const f=fixture(t),pending=f.openPosition(request);await flush();
+ const now=Math.floor(Date.now()/1000),id=f.intentId;
+ const history=Array.from({length:3000},(_,i)=>({id:`0x${(i+1).toString(16).padStart(64,'0')}`,positionId:`0x${(i+1).toString(16).padStart(64,'0')}`,kind:'close',owner,status:'confirmed',pinTime:now,fill:null,error:null,tx:null}));
+ const accepted={id,positionId:id,kind:'open',owner,status:'accepted',pinTime:now+2,fill:null,error:null,tx:null};
+ f.setState(f.recordIntent(f.getState(),{...accepted,status:'filled',fill:{price:'8000000000000'}}));
+ const merged=f.recordIntents(f.getState(),[...history,accepted]);f.setState(merged);
+ assert.equal(Object.keys(merged.intents).length,3001);assert.equal(merged.intents[id].status,'filled');assert.equal(merged.intents[id].order.margin,'20000000');assert.equal(Object.keys(merged.openSubmissions).length,0);
+ f.accept();await pending;
+});

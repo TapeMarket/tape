@@ -31,16 +31,25 @@ export function mergeIntent(previous: Intent | undefined, incoming: Intent): Int
   return { ...previous, ...incoming, ...newer, order: incoming.order ?? previous?.order };
 }
 
-export function recordIntent(state: Pick<State, "intents" | "openSubmissions">, incoming: Intent, submissionId?: string) {
+/** Merge a full account response in one pass; do not copy its entire history per order. */
+export function recordIntents(state: Pick<State, "intents" | "openSubmissions">, incoming: Intent[], submissionId?: string) {
+  const intents = { ...state.intents };
   const submissions = { ...state.openSubmissions };
-  let order = incoming.order;
-  for (const [id, submission] of Object.entries(submissions)) {
-    if (id !== submissionId && submission.intentId !== incoming.id) continue;
-    if (submission.owner.toLowerCase() !== incoming.owner.toLowerCase()) continue;
-    order ??= submission.order;
-    delete submissions[id];
+  for (const intent of incoming) {
+    let order = intent.order;
+    for (const [id, submission] of Object.entries(submissions)) {
+      if (id !== submissionId && submission.intentId !== intent.id) continue;
+      if (submission.owner.toLowerCase() !== intent.owner.toLowerCase()) continue;
+      order ??= submission.order;
+      delete submissions[id];
+    }
+    intents[intent.id] = mergeIntent(intents[intent.id], { ...intent, order });
   }
-  return { intents: { ...state.intents, [incoming.id]: mergeIntent(state.intents[incoming.id], { ...incoming, order }) }, openSubmissions: submissions };
+  return { intents, openSubmissions: submissions };
+}
+
+export function recordIntent(state: Pick<State, "intents" | "openSubmissions">, incoming: Intent, submissionId?: string) {
+  return recordIntents(state, [incoming], submissionId);
 }
 
 export function withoutSubmissions(submissions: State["openSubmissions"], resolved: Set<string>) {

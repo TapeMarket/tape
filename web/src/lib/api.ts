@@ -6,7 +6,7 @@ import { API_URL, PREVIEW } from "./mode";
 import { EMPTY_HISTORY, getState, setState, toast, type Tick } from "./store";
 import type { Account, Address, CoinPayload, Config, History, HousePayload, Intent, Leaderboard, Position, SeriesPoint, Status, TapeChip, Trade, Season, JackpotPayload } from "./types";
 import { usd } from "./format";
-import { recordIntent, withoutSubmissions } from "./open-orders";
+import { recordIntent, recordIntents, withoutSubmissions } from "./open-orders";
 
 export class ApiError extends Error {
   constructor(
@@ -149,12 +149,9 @@ export async function loadAccount(): Promise<void> {
   if (current?.blockNumber && account.blockNumber === current.blockNumber && balanceVersion !== accountBalanceVersion) return;
   appliedAccountRead = sequence;
   // This snapshot may be older than what the stream has already said: an order only moves forward.
-  let intents = { ...getState().intents };
-  let openSubmissions = getState().openSubmissions;
-  for (const intent of account.intents) {
-    const next = recordIntent({ intents, openSubmissions }, intent);
-    intents = next.intents; openSubmissions = next.openSubmissions;
-  }
+  const next = recordIntents(getState(), account.intents);
+  const intents = next.intents;
+  let openSubmissions = next.openSubmissions;
   // An HTTP snapshot can reach us before the indexer catches up, then arrive after its close event.
   const closed = new Set(getState().history.trades.map(trade => trade.id));
   openSubmissions = withoutSubmissions(openSubmissions, new Set([...closed, ...account.positions.map(p => p.id)]));
