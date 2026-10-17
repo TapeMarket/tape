@@ -1,5 +1,4 @@
 import { clockText, useJackpot } from "../lib/jackpot";
-import { isTradFi, listWords, nameOf } from "../lib/names";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Link } from "../components/Link";
 import { Wordmark } from "../components/Wordmark";
@@ -143,15 +142,8 @@ export function Landing() {
   const chainId = useStore((s) => s.config?.chainId);
   const coin = useStore((s) => s.config?.coin?.symbol) ?? BRAND.toUpperCase();
   const coinPending = !PREVIEW && !coinState?.attached;
-  const leverage = Math.max(1000, ...(markets ?? []).map((m) => m.maxLeverage));
   const listed = (markets ?? []).filter((m) => !m.retired);
-  // The headline names the markets at the top leverage; the line under it the rest.
-  const top = listed.filter((m) => m.maxLeverage === leverage).map((m) => m.symbol);
-  const pair = top.length ? listWords(top) : "BTC and ETH";
-  const others = listed.filter((m) => m.maxLeverage !== leverage);
-  const crypto = others.filter((m) => !isTradFi(m.symbol)).map((m) => m.symbol);
-  const tradfi = others.filter((m) => isTradFi(m.symbol)).map((m) => (m.symbol === "SPX" ? "the S&P 500" : m.symbol === "GOLD" ? "gold" : nameOf(m.symbol)));
-  const more = [...crypto, ...tradfi];
+  const leverage = listed.length ? Math.max(...listed.map((m) => m.maxLeverage)) : 1000;
   const figures = [
     { label: "Traded", value: house ? usdNumber(house.totals.volume) : 0, format: (n: number) => usdCompact(BigInt(Math.round(n * 1e6))) },
     { label: "Trades", value: house ? house.totals.trades : 0, format: (n: number) => Math.round(n).toLocaleString("en-US") },
@@ -167,12 +159,12 @@ export function Landing() {
         <div className="lp-hero-grid">
           <div className="lp-hero-copy">
             <h1 className="rise" style={delay(0.15)}>
-              <span>Trade {pair}</span>
-              <span>at <em>{leverage}x</em>.</span>
+              <span>{listed.length ? `Trade ${listed.length} markets.` : "Trade global markets."}</span>
+              <span>Up to <em>{leverage}x</em>.</span>
             </h1>
             <p className="rise" style={delay(0.3)}>
-              {more.length ? `Plus ${listWords(more)}, at up to ${Math.max(...others.map((m) => m.maxLeverage))}x.` : `Up to ${leverage}x on ${pair}.`} Settled in USDC on
-              Ethereum. Opening a position is free and there is no funding.
+              Crypto, stocks, gold and the S&amp;P 500. Settled in USDC on Ethereum.
+              No opening fee or funding. Leverage varies by market.
             </p>
             <div className="lp-cta rise" style={delay(0.42)}>
               <Link to="/trade" className="lp-btn primary">
@@ -287,7 +279,7 @@ export function Landing() {
             ["Funding", "$0"],
             ["Spread", "$0"],
             ["Max leverage", `${leverage}x`],
-            ["Markets", pair],
+            ["Markets", listed.length ? String(listed.length) : "–"],
             ["Settled in", "USDC"],
             ["Loss rewards", coinPending ? "Coin launch pending" : `$${coin}`],
             ["Vault started at", "$0"],

@@ -4111,6 +4111,7 @@ p {
 
 @media (max-width: 600px) {
   .lp-hero { padding-top: 30px; }
+  .lp-hero h1 > span:last-child { font-size: clamp(44px, 13vw, 62px); }
   .lp-hero p { margin-top: 20px; font-size: 16px; }
   .lp-cta { gap: 8px; margin-top: 24px; }
   .lp-btn { padding-inline: 20px; font-size: 15px; }
