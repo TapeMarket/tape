@@ -46,6 +46,7 @@ export interface TapeChip {
 }
 
 export interface Config {
+  previousExchange?: { address: Address; apiUrl: string; siteUrl: string };
   name: string;
   chainId: number;
   time: number;

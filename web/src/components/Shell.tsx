@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { claimUsername } from "../lib/actions";
 import { post } from "../lib/api";
 import { big, percent, price, priceNumber, shortAddress, usdDown, usdNumber } from "../lib/format";
-import { BRAND, PREVIEW } from "../lib/mode";
+import { BRAND, LEGACY, PREVIEW } from "../lib/mode";
 import { navigate, setState, toast, useStore } from "../lib/store";
 import { connectWith, disconnect, walletOptions, type WalletOption } from "../lib/wallet";
 import type { TapeChip } from "../lib/types";
@@ -184,7 +184,7 @@ export function TopBar() {
               }
             >
               <Link to="/portfolio">Portfolio</Link>
-              <button onClick={() => setState({ dialog: "deposit" })}>Deposit</button>
+              {!LEGACY && <button onClick={() => setState({ dialog: "deposit" })}>Deposit</button>}
               <button onClick={() => setState({ dialog: "withdraw" })}>Withdraw</button>
               <button onClick={() => navigator.clipboard?.writeText(owner).then(() => toast("info", "Address copied"), () => {})}>Copy address</button>
               <button onClick={() => setState({ dialog: "username" })}>{account?.name ? "Change username" : "Claim a username"}</button>
@@ -195,10 +195,10 @@ export function TopBar() {
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5" /></svg>
               <span className="hide-narrow">Withdraw</span>
             </button>
-            <button className="wallet-add" onClick={() => setState({ dialog: "deposit" })} aria-label="Deposit" title="Deposit">
+            {!LEGACY && <button className="wallet-add" onClick={() => setState({ dialog: "deposit" })} aria-label="Deposit" title="Deposit">
               <span aria-hidden="true">+</span>
               <span className="hide-narrow">Deposit</span>
-            </button>
+            </button>}
           </div>
         ) : (
           <button className="wallet-connect" onClick={() => setState({ dialog: "connect" })}>
@@ -396,6 +396,7 @@ export function Dialogs() {
   const dialog = useStore((s) => s.dialog);
   const owner = useStore((s) => s.owner);
   if (dialog === "connect") return <ConnectDialog />;
+  if (dialog === "deposit" && LEGACY) return <Dialog title="Previous exchange"><p>Deposits have moved to the current exchange.</p><a className="btn primary" href="/trade">Open current Tape</a></Dialog>;
   // Ready with the exchange shell: opening a money action must not wait for another script.
   if (dialog === "deposit") return <DepositDialog key={owner} />;
   if (dialog === "withdraw") return <WithdrawDialog key={owner} />;

@@ -103,6 +103,7 @@ contract SignedOracle is IOracle {
     function read(bytes32 feedId, bytes[] calldata update)
         public
         view
+        virtual
         returns (uint64 price, uint64 conf, uint64 publishTime, uint64 prevPublishTime)
     {
         if (update.length != 1 || update[0].length != PRINT_LENGTH) revert BadUpdate();

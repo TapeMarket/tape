@@ -170,7 +170,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * passed, so in the last quarter of a second the next one is used: a clock a little behind the
  * relayer's must not turn into a rejected order.
  */
-const stamp = (): bigint => BigInt(Math.floor((Date.now() + getState().clockOffset) / 1000 + 0.25));
+const stamp = (): bigint => BigInt(Math.floor((Date.now() + getState().clockOffset) / 1000 + (getState().config?.timing?.execDelay === 0 ? 0 : 0.25)));
 
 type SignTrade = (primaryType: "Open" | "Close" | "Trigger" | "CancelTrigger", message: Record<string, unknown>) => Promise<Hex>;
 

@@ -74,6 +74,8 @@ export function loadConfig(env = process.env) {
     throw new Error(`No deployment file at ${deploymentFile}. Deploy first, or set DEPLOYMENT.`);
   }
   const deployment = JSON.parse(readFileSync(deploymentFile, "utf8"));
+  const executionMode = deployment.executionMode ?? "delayed";
+  if (!["delayed", "order-bound"].includes(executionMode)) throw new Error("Unknown deployment executionMode.");
   // The coin is attached later on mainnet and lives in its own file.
   const coinFile = deploymentFile.replace(/\.json$/, "-coin.json");
   if (existsSync(coinFile)) Object.assign(deployment, JSON.parse(readFileSync(coinFile, "utf8")));
@@ -136,6 +138,8 @@ export function loadConfig(env = process.env) {
     oracleKind,
     priceSignerKey,
     priceSource: get("PRICE_SOURCE", chainId === 31337 ? "dev" : oracleKind === "signed" ? "hyperliquid" : "hermes"),
+    executionMode,
+    readOnlyOpens: get("READ_ONLY_OPENS", "0") === "1",
     hyperliquidWsUrl: get("HYPERLIQUID_WS_URL", "wss://api.hyperliquid.xyz/ws"),
     hyperliquidApiUrl: get("HYPERLIQUID_API_URL", "https://api.hyperliquid.xyz"),
     priceSanityBps,

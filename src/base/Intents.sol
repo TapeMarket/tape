@@ -147,7 +147,7 @@ abstract contract Intents {
     }
 
     /// @dev Withdrawals take the wallet's own signature. A session key is never enough.
-    function _requireWalletAuth(address owner, bytes32 digest, bytes calldata signature) internal view {
+    function _requireWalletAuth(address owner, bytes32 digest, bytes calldata signature) internal view virtual {
         if (!SignatureChecker.isValidSignatureNow(owner, digest, signature)) revert BadSignature();
     }
 }

@@ -219,12 +219,25 @@ export function createHyperliquidSource({
   fetchImpl = fetch,
   WebSocketImpl = globalThis.WebSocket,
   now = Date.now,
+  orderBound = false,
 }) {
   if (!signer) throw new Error("The Hyperliquid price source signs its prints: it needs the price signer.");
 
   /** feed id (lower case) => its one chain of prints */
   const feeds = new Map();
   const byCoin = new Map();
+  const executionWaiters = new Set();
+  let persistenceFailed = false;
+  const snapshots = new Map();
+  const snapshotTimes = [];
+  let snapshotId = 0;
+  function snapshotBudget() {
+    const at = now();
+    while (snapshotTimes.length && snapshotTimes[0] < at - 60_000) snapshotTimes.shift();
+    if (snapshotTimes.length >= 200) return false; // 400 info weight/minute; reserve room for reference checks.
+    snapshotTimes.push(at);
+    return true;
+  }
   for (const market of markets) {
     const coin = coinOfFeed(market.feedId);
     if (!coin) throw new Error(`Market ${market.id}'s feed id ${market.feedId} does not name a Hyperliquid coin ("hyperliquid:<COIN>"). It cannot be priced from Hyperliquid.`);
@@ -244,6 +257,7 @@ export function createHyperliquidSource({
         first: false,
         lastMid: null,
         lastPrintAt: 0,
+        lastObservedAt: 0,
         lastWsAt: 0,
         polling: false,
         lastPollAt: 0,
@@ -293,6 +307,7 @@ export function createHyperliquidSource({
 
   /** A quote from either transport. */
   function ingest(coin, bidText, askText, hlTime, viaStream = true) {
+    if (stopped) return;
     const state = byCoin.get(coin);
     if (!state || !Number.isFinite(hlTime)) return;
     const at = now();
@@ -302,12 +317,23 @@ export function createHyperliquidSource({
     if (hlTime - at > MAX_SKEW_MS) return;
     const quote = quoteOf(bidText, askText);
     if (!quote) return;
+    if (orderBound && state.quote && hlTime <= state.quote.hlTime) return;
     // An older quote than the one held changes nothing, unless the one held is past signing anyway.
     if (state.quote && hlTime < state.quote.hlTime && at - state.quote.at <= SIGN_MAX_AGE_MS) return;
     state.quote = { ...quote, hlTime, at };
+    if (orderBound) {
+      if (usableExecution(state, at)) {
+        const second = Math.floor(hlTime / 1000);
+        if ((second > state.lastTime || state.lastObservedAt > 0) && hlTime > state.lastObservedAt) {
+          emit(state, state.quote, second, Math.floor(state.lastObservedAt / 1000), at);
+        }
+        for (const waiter of executionWaiters) if (waiter.state === state) waiter.check();
+      }
+    }
   }
 
   async function poll(state) {
+    if (orderBound && !snapshotBudget()) { state.lastPollAt = now(); return; }
     state.polling = true;
     state.lastPollAt = now();
     try {
@@ -325,6 +351,15 @@ export function createHyperliquidSource({
     } finally {
       state.polling = false;
     }
+  }
+
+  function requestSnapshot(state) {
+    if (!socket || socket.readyState !== 1 || [...snapshots.values()].some(value => value.state === state) || !snapshotBudget()) return;
+    const id = ++snapshotId;
+    const timer = setTimeout(() => snapshots.delete(id), 2000);
+    snapshots.set(id, { state, timer });
+    try { socket.send(JSON.stringify({ method: "post", id, request: { type: "info", payload: { type: "l2Book", coin: state.coin } } })); }
+    catch { clearTimeout(timer); snapshots.delete(id); }
   }
 
   function sane(state, quote, at) {
@@ -347,21 +382,63 @@ export function createHyperliquidSource({
   }
 
   function emit(state, quote, time, prev, at) {
+    if (persistenceFailed) return;
     if (time > state.lastTime) state.first = true;
     state.lastTime = time;
     state.lastMid = quote.mid;
     state.lastPrintAt = at;
     state.why = null;
-    const print = { time, prev, price: quote.mid, conf: quote.conf };
+    const print = { time, prev, price: quote.mid, conf: quote.conf,
+      ...(orderBound ? { observedAt: quote.hlTime, prevObservedAt: state.lastObservedAt } : {}) };
+    if (orderBound) state.lastObservedAt = quote.hlTime;
     // One at a time and in order: the book, like the contract, reads prints as a chain.
     state.chain = state.chain
       .then(async () => {
         const blob = await signer.sign(state.feedId, print);
         // On disk before anything is built on it (see printlog.mjs).
-        printLog?.append(state.feedId, { ...print, blob });
+        if (orderBound && printLog) await printLog.appendDurable(state.feedId, { ...print, blob });
+        else printLog?.append(state.feedId, { ...print, blob });
         for (const id of state.marketIds) if (!retired(id)) book.add(id, { ...print, blob, at: now() });
       })
-      .catch((error) => log.error(`hyperliquid: signing a ${state.coin} print failed`, error));
+      .catch((error) => {
+        if (orderBound) { persistenceFailed = true; state.why = "Price storage unavailable"; }
+        log.error(`hyperliquid: signing a ${state.coin} print failed`, error);
+      });
+  }
+
+  function usableExecution(state, at = now()) {
+    const quote = state.quote;
+    const apart = clockOffset();
+    return !persistenceFailed && quote && Number.isFinite(apart) && Math.abs(apart) <= 500
+      && at >= quote.at && at - quote.at + lateness(quote) <= SIGN_MAX_AGE_MS && sane(state, quote, at);
+  }
+
+  /** First fresh exchange observation after intake, with no scheduled pricing sleep. */
+  function execution(marketId, receivedAt, minTime, afterMs = 0) {
+    if (stopped) return Promise.reject(new Error("The price feed stopped"));
+    if (!orderBound) return Promise.reject(new Error("This deployment uses delayed public pricing"));
+    const state = states.find(value => value.marketIds.includes(marketId));
+    if (!state || retired(marketId) || persistenceFailed) return Promise.reject(new Error("Execution prices are unavailable"));
+    if (executionWaiters.size >= 2000) return Promise.reject(new Error("The execution feed is busy. Try again shortly."));
+    return new Promise((resolve, reject) => {
+      let timer;
+      const finish = (fn, value) => { clearTimeout(timer); executionWaiters.delete(waiter); fn(value); };
+      const waiter = { state, check() {
+        const quote = state.quote;
+        if (!usableExecution(state) || quote.at <= receivedAt || quote.hlTime <= Math.max(receivedAt, afterMs) || Math.floor(quote.hlTime / 1000) < minTime) return;
+        if (Math.floor(quote.hlTime / 1000) > minTime + 10) return finish(reject, new Error("No fresh execution price inside the order window"));
+        const price = { price: quote.mid, conf: quote.conf, time: Math.floor(quote.hlTime / 1000), observedAt: quote.hlTime };
+        // Publish every earlier liquidation observation before releasing this manual fill. A
+        // recovered price must not let a close jump ahead of an already-observed bust.
+        clearTimeout(timer); executionWaiters.delete(waiter);
+        state.chain.then(() => persistenceFailed ? reject(new Error("Price storage unavailable")) : resolve(price), reject);
+      }, cancel: () => finish(reject, new Error("The price feed stopped")) };
+      timer = setTimeout(() => finish(reject, new Error("A fresh price did not arrive. Nothing was executed.")), Math.max(1, Math.min(12_000, (minTime + 10) * 1000 - now())));
+      executionWaiters.add(waiter);
+      waiter.check();
+      if (executionWaiters.has(waiter)) requestSnapshot(state);
+      if (executionWaiters.has(waiter) && !state.polling && (!socket || now() - state.lastWsAt > 1000)) void poll(state);
+    });
   }
 
   /** Looks at every feed once and signs what is due. `at` is the time, in ms. */
@@ -371,7 +448,8 @@ export function createHyperliquidSource({
     for (const state of states) {
       const quote = state.quote;
       const age = quote ? at - quote.at + lateness(quote) : Infinity;
-      if (age > CONFIRM_AFTER_MS && !state.polling && at - state.lastPollAt >= pollEveryMs) poll(state);
+      if (age > (orderBound ? 1500 : CONFIRM_AFTER_MS) && !state.polling && at - state.lastPollAt >= pollEveryMs) poll(state);
+      if (orderBound) continue; // Every eligible source observation is signed in ingest(), including intrasecond moves.
       if (Number.isFinite(apart) && Math.abs(apart) > MAX_SKEW_MS) {
         complain(state, `this machine's clock and Hyperliquid's are ${(apart / 1000).toFixed(1)}s apart. Fix the clock (NTP).`, "error");
         continue;
@@ -399,6 +477,19 @@ export function createHyperliquidSource({
     // Whatever arrives, this must not throw: an error here would end the process.
     try {
       const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+      if (orderBound && message?.channel === "post") {
+        const pending = snapshots.get(message.data?.id);
+        if (!pending) return;
+        clearTimeout(pending.timer); snapshots.delete(message.data.id);
+        const response = message.data.response;
+        const data = response?.type === "info" && response.payload?.type === "l2Book" ? response.payload.data : null;
+        if (data?.coin === pending.state.coin && Array.isArray(data.levels?.[0]) && Array.isArray(data.levels?.[1])) ingest(data.coin, data.levels[0][0]?.px, data.levels[1][0]?.px, Number(data.time), true);
+        return;
+      }
+      if (orderBound && message?.channel === "l2Book" && Array.isArray(message.data?.levels?.[0]) && Array.isArray(message.data?.levels?.[1])) {
+        ingest(message.data.coin, message.data.levels[0][0]?.px, message.data.levels[1][0]?.px, Number(message.data.time), true);
+        return;
+      }
       if (message?.channel !== "bbo" || !message.data || !Array.isArray(message.data.bbo)) return;
       const [bid, ask] = message.data.bbo;
       ingest(message.data.coin, bid?.px, ask?.px, Number(message.data.time), true);
@@ -424,6 +515,7 @@ export function createHyperliquidSource({
       for (const state of states) {
         state.lastWsAt = openedAt;
         ws.send(JSON.stringify({ method: "subscribe", subscription: { type: "bbo", coin: state.coin } }));
+        if (orderBound) ws.send(JSON.stringify({ method: "subscribe", subscription: { type: "l2Book", coin: state.coin } }));
       }
       log.info(`hyperliquid: streaming ${states.map((s) => s.coin).join(", ")}`);
     });
@@ -479,8 +571,9 @@ export function createHyperliquidSource({
     for (const record of printLog.load()) {
       const state = feeds.get(String(record.feedId).toLowerCase());
       if (!state) continue;
-      for (const id of state.marketIds) book.restore(id, { time: record.time, prev: record.prev, price: record.price, conf: record.conf, blob: record.blob, at: now() });
+      for (const id of state.marketIds) book.restore(id, { ...record, at: now() });
       if (record.time > state.lastTime) state.lastTime = record.time;
+      if (orderBound && record.observedAt > state.lastObservedAt) state.lastObservedAt = record.observedAt;
       restored++;
     }
     return restored;
@@ -498,8 +591,11 @@ export function createHyperliquidSource({
     },
     stop() {
       stopped = true;
+      for (const waiter of executionWaiters) waiter.cancel();
       for (const timer of timers) clearInterval(timer);
       clearTimeout(reconnectTimer);
+      for (const value of snapshots.values()) clearTimeout(value.timer);
+      snapshots.clear();
       reference?.stop?.();
       try {
         socket?.close();
@@ -510,6 +606,7 @@ export function createHyperliquidSource({
     },
     /** Nothing to fall back to: this process makes every print, and the book and the log hold them. */
     at: async () => null,
+    execution,
     /** For the status page: is each feed being priced, and if not, why. */
     health() {
       const apart = clockOffset();

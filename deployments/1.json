@@ -1,16 +1,24 @@
 {
-  "batcher": "0xF569bEC7Ba0B0603483f46EEc47AD947e18C6156",
-  "block": 26208224,
   "chainId": 1,
-  "exchange": "0x77DB922a0C4CBB77056243785D00A70676f700C1",
-  "gateway": "0xd94B53ce161C84C0c3F647284f39130DD9eFe474",
-  "lens": "0x6c7951f77bD698A525a07C8E485F22aF70F66387",
   "name": "Tape",
-  "oracle": "0x61044ECFAe7881cD6557aCcc1b0f18aE31BcbC34",
   "oracleKind": "signed",
-  "priceSigner": "0x1377c563693FEeB4ff88936779fba583197FAF4E",
+  "executionMode": "order-bound",
+  "exchangeContract": "FastExchange",
+  "oracleContract": "ExecutionOracle",
+  "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
   "pricing": "0xd170144B7b2F6B3423Ac5974F29c1FED4759Cf93",
   "sessions": "0x2d1dd1980c050E509042Fee55B91184c3979940F",
-  "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-  "deposits": "0xE7B009729349bE8479421f01D11E6882C07a38Fd"
+  "priceSigner": "0x1377c563693FEeB4ff88936779fba583197FAF4E",
+  "oracle": "0x3c6dcFbcCD0deB7b682492ac89CAB6cCE6538055",
+  "exchange": "0x06FDA5DF6C1a8BbC24bF4A2E717302163E23b062",
+  "lens": "0x91490008aa27Be3988B109D22b666537e703F89E",
+  "gateway": "0x54f7c8DFAaB564957d53f0ecfBa8EdD9F6C8070C",
+  "batcher": "0x42883d81D4CC1c541B7B728cCd103BC40F35A799",
+  "deposits": "0x937292c6D7F8dB3784c91cE8DFaa6F8352224Ceb",
+  "previousExchange": {
+    "address": "0x77DB922a0C4CBB77056243785D00A70676f700C1",
+    "apiUrl": "https://api.tapemarket.io/v1",
+    "siteUrl": "https://tapemarket.io/trade?legacy=1"
+  },
+  "block": 26214812
 }

@@ -24,6 +24,7 @@ export function createStore() {
     markets: [],
     /** Open positions, and fills on their way to the chain. id -> position */
     positions: new Map(),
+    pricingTimes: new Map(),
     /** Closed trades, oldest first. */
     trades: [],
     /** Lifetime numbers per trader. address -> stats */
@@ -205,6 +206,10 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
     const tx = logEntry.transactionHash;
 
     switch (eventName) {
+      case "PositionPricingTime": {
+        store.pricingTimes.set(args.id, Number(args.observedAt));
+        break;
+      }
       case "MarketListed": {
         // Symbols only exist in this event; remember them before the first refresh.
         store.markets[Number(args.id)] = { ...(store.markets[Number(args.id)] ?? {}), id: Number(args.id), symbol: args.symbol, feedId: args.feedId };
@@ -223,6 +228,7 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
           debtMargin: args.debtMargin,
           entryPrice: args.entryPrice,
           entryTime: Number(args.entryTime),
+          ...(store.pricingTimes.has(args.id) ? { entryAtMs: store.pricingTimes.get(args.id) } : {}),
           bust: bustPrice(args.entryPrice, Number(args.leverage), args.isLong, store.markets[Number(args.market)]),
           // What a win's impact is charged on, in whole dollars: fixed by the contract at open.
           impactNotional: Number(args.impactNotional),
@@ -232,6 +238,7 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
           liquidating: store.positions.get(args.id)?.liquidating ?? false,
         };
         store.positions.set(args.id, position);
+        store.pricingTimes.delete(args.id);
         const notional = args.margin * BigInt(args.leverage);
         const user = userOf(store, args.owner);
         user.volume += notional;

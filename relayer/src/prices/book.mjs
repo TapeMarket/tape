@@ -124,6 +124,7 @@ export function createBook(marketIds) {
     history,
     pinned,
     between,
+    betweenMs: (marketId, after, upTo) => (prints.get(marketId) ?? []).filter(p => p.observedAt > after && p.observedAt <= upTo),
     /** The print an intent pinned at `minTime` fills at, if the book holds it. */
     firstAt: (marketId, minTime) => findPinned(marketId, minTime).print ?? null,
     onTick(listener) {

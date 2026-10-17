@@ -49,10 +49,13 @@ export function cashExposureLimit(cash, floorUsd, multiple, committed = 0n) {
   return extra < hard ? extra : hard;
 }
 
-export function createEngine({ config, chain, book, source, store, queue, hub, log }) {
+export function createEngine({ config, chain, book, source, store, queue, hub, log, executions = null, onPricedOpen = () => {}, onCloseReleased = () => {} }) {
   const { addresses, read, publicClient } = chain;
   const domain = buildDomain(config.deployment.name, config.chainId, addresses.exchange);
   const sessionsDomain = sessionDomain(config.deployment.name, config.chainId, addresses.sessions);
+  const orderBound = config.executionMode === "order-bound";
+  const execDelay = orderBound ? 0 : EXEC_DELAY;
+  if (orderBound && !executions) throw new Error("Order-bound execution needs its durable quote journal.");
 
   /** Accepted intents, by id, until a while after they settle. */
   const intents = new Map();
@@ -87,7 +90,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
 
   function requireFresh(timestamp) {
     const now = nowSeconds();
-    if (!Number.isInteger(timestamp) || timestamp < now || timestamp > now + STAMP_AHEAD) {
+    if (!Number.isInteger(timestamp) || timestamp < now - (orderBound ? 1 : 0) || timestamp > now + STAMP_AHEAD) {
       throw new Rejected("Order timestamp is not current. Check your clock and retry.");
     }
   }
@@ -187,6 +190,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
   // ---------------------------------------------------------------------------------------
 
   async function open(body) {
+    if (config.readOnlyOpens) throw new Rejected("This exchange has moved. Withdraw your remaining balance here, then open current Tape to trade.", 409);
     const it = body?.intent;
     const signature = body?.signature;
     if (!it || typeof it !== "object" || !isHex(signature) || !isAddr(it.owner)) throw new Rejected("Malformed order.");
@@ -239,7 +243,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
     if (sideOi + notional > cashRoom()) throw new Rejected(CASH_FULL);
 
     const id = hashTypedData({ domain, types, primaryType: "Open", message });
-    if (intents.has(id)) throw new Rejected("Duplicate order.");
+    if (intents.has(id) || (orderBound && executions.has(id))) throw new Rejected("Duplicate order. An earlier quote cannot be submitted as a new order.");
     await requireTradeAuth(owner, "Open", message, signature, timestamp);
     limit(owner);
 
@@ -280,7 +284,8 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
       owner,
       positionId: id,
       status: "accepted",
-      pinTime: timestamp + EXEC_DELAY,
+      pinTime: timestamp + execDelay,
+      receivedAt: Date.now(),
       message,
       signature,
       need,
@@ -296,7 +301,9 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
     const { message, signature, id, owner } = record;
     const notional = message.margin * BigInt(message.leverage);
     try {
-      const print = await book.pinned(market.id, record.pinTime, PIN_WINDOW, source.at);
+      const print = orderBound
+        ? await executions.price({ id: record.id, market, timestamp: Number(message.timestamp), receivedAt: record.receivedAt })
+        : await book.pinned(market.id, record.pinTime, PIN_WINDOW, source.at);
 
       if (print.conf * BPS > print.price * BigInt(market.maxConfBps)) throw new Rejected("Price too uncertain to open right now.");
       if (message.priceLimit !== 0n && (message.isLong ? print.price > message.priceLimit : print.price < message.priceLimit)) {
@@ -326,6 +333,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
         debtMargin: 0n,
         entryPrice: print.price,
         entryTime: print.time,
+        ...(orderBound ? { entryAtMs: print.observedAt } : {}),
         bust: bustPrice(print.price, message.leverage, message.isLong, market),
         // What the side holds now. The contract decides when the order lands, and orders ahead of
         // this one in the queue can make it more; the opening's own event then replaces this.
@@ -338,7 +346,9 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
       update(record, { status: "filled", fill: { price: print.price, time: print.time } });
       hub.publish(acct(owner), "position", position);
 
-      const result = await queue.push({ label: `open ${id.slice(0, 10)}`, functionName: "open", args: [message, signature, [print.blob]] });
+      const submitted = queue.push({ label: `open ${id.slice(0, 10)}`, functionName: "open", args: [message, signature, [print.blob]] });
+      if (orderBound) onPricedOpen(id);
+      const result = await submitted;
       if (!result.ok) throw new Rejected(result.reason === "ImpactLimitExceeded" ? IMPACT_PAST_LIMIT : (result.reason ?? "The order was not accepted on-chain."));
       // It is on-chain now. The indexer will overwrite this with the event's own data.
       if (position.status === "pending") {
@@ -386,12 +396,12 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
     if (!store.markets[position.market].retired) requireLivePrices(store.markets[position.market]);
     // A binding direct close stands until it lapses; the contract refuses a signed close that
     // would be priced at or after it.
-    if (position.closeRequestedAt && nowSeconds() < position.closeRequestedAt + REQUEST_EXPIRY && timestamp + EXEC_DELAY >= position.closeRequestedAt + DIRECT_DELAY) {
+    if (position.closeRequestedAt && nowSeconds() < position.closeRequestedAt + REQUEST_EXPIRY && timestamp + execDelay >= position.closeRequestedAt + DIRECT_DELAY) {
       throw new Rejected("A direct close is already pending for this position.");
     }
     if (closing.has(position.id)) throw new Rejected("This position is already closing.");
     if (position.liquidating) throw new Rejected("This position hit its liquidation price.");
-    if (timestamp + EXEC_DELAY <= position.entryTime) throw new Rejected("Too soon after opening.");
+    if (!orderBound && timestamp + execDelay <= position.entryTime) throw new Rejected("Too soon after opening.");
     await requireTradeAuth(owner, "Close", message, signature, timestamp);
     // Closes are counted apart from opens, with room for a Close All on a full account (200).
     limit(owner, "closes", Math.max(config.rateLimit, CLOSES_PER_MINUTE));
@@ -400,9 +410,10 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
     if (closing.has(position.id)) throw new Rejected("This position is already closing.");
 
     const id = hashTypedData({ domain, types, primaryType: "Close", message });
-    const record = { id, kind: "close", owner, positionId: position.id, status: "accepted", pinTime: timestamp + EXEC_DELAY, message, signature };
+    if (orderBound && (intents.has(id) || executions.has(id))) throw new Rejected("Duplicate close. Wait for the original order or sign a new one.");
+    const record = { id, kind: "close", owner, positionId: position.id, status: "accepted", pinTime: timestamp + execDelay, receivedAt: Date.now(), message, signature };
     intents.set(id, record);
-    closing.set(position.id, record.pinTime);
+    closing.set(position.id, orderBound ? record.receivedAt : record.pinTime);
     hub.publish(acct(owner), "intent", view(record));
     settleClose(record, position).catch((error) => log.error("close", error));
     return view(record);
@@ -410,14 +421,19 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
 
   async function settleClose(record, position) {
     const market = store.markets[position.market];
+    let succeeded = false;
     try {
       let price;
       let blob = [];
       if (market.retired) {
         price = market.frozenPrice;
       } else {
-        const print = await book.pinned(market.id, record.pinTime, PIN_WINDOW, source.at);
-        if (print.time <= position.entryTime) throw new Rejected("Too soon after opening.");
+        const print = orderBound
+          ? await executions.price({ id: record.id, market, timestamp: Number(record.message.timestamp), receivedAt: record.receivedAt, afterMs: position.entryAtMs ?? (position.entryTime * 1000 + 999) })
+          : await book.pinned(market.id, record.pinTime, PIN_WINDOW, source.at);
+        if (orderBound && position.liquidating) throw new Rejected("This position hit its liquidation price before the close.");
+        if (!orderBound && print.time <= position.entryTime) throw new Rejected("Too soon after opening.");
+        if (orderBound) closing.set(position.id, print.observedAt);
         price = print.price;
         blob = [print.blob];
       }
@@ -429,11 +445,13 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
         throw new Rejected(result.reason === "NoPosition" ? "The position was already closed or hit its liquidation price." : (result.reason ?? "The close was not accepted on-chain."));
       }
       update(record, { status: "confirmed", tx: result.hash });
+      succeeded = true;
     } catch (error) {
       update(record, { status: "failed", error: error instanceof Rejected ? error.message : (error.message ?? "failed") });
       if (!(error instanceof Rejected)) log.warn(`close ${position.id.slice(0, 10)} failed: ${error.message}`);
     } finally {
       closing.delete(position.id);
+      if (orderBound && !succeeded) onCloseReleased(position.id);
       forgetLater(record);
     }
   }
@@ -576,7 +594,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
         if (!trigger) continue;
         const { message } = trigger;
         const from = Math.max(Number(message.timestamp), position.entryTime);
-        if (print.time <= from) continue;
+        if (orderBound ? print.observedAt <= Math.max((Number(message.timestamp) + 1) * 1000 - 1, position.entryAtMs ?? position.entryTime * 1000 + 999) : print.time <= from) continue;
         if (message.above ? print.price < message.price : print.price > message.price) continue;
         fireTrigger(position, trigger, print);
         break;
@@ -587,9 +605,9 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
 
   function fireTrigger(position, trigger, touch) {
     const id = hashTypedData({ domain, types, primaryType: "Trigger", message: trigger.message });
-    const record = { id, kind: "close", owner: position.owner, positionId: position.id, status: "accepted", pinTime: touch.time + EXEC_DELAY, trigger, touch };
+    const record = { id, kind: "close", owner: position.owner, positionId: position.id, status: "accepted", pinTime: touch.time + execDelay, trigger, touch };
     intents.set(id, record);
-    closing.set(position.id, record.pinTime);
+    closing.set(position.id, orderBound ? touch.observedAt : record.pinTime);
     hub.publish(acct(position.owner), "intent", view(record));
     settleTrigger(record, position).catch((error) => log.error("trigger", error));
   }
@@ -597,8 +615,9 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
   async function settleTrigger(record, position) {
     const market = store.markets[position.market];
     const pair = triggers.get(position.id);
+    let succeeded = false;
     try {
-      const print = await book.pinned(market.id, record.pinTime, PIN_WINDOW, source.at);
+      const print = orderBound ? record.touch : await book.pinned(market.id, record.pinTime, PIN_WINDOW, source.at);
       const quote = quoteClose(position, market, print.price);
       update(record, { status: "filled", fill: { price: print.price, pnl: quote.pnl, busted: quote.busted } });
       const result = await queue.push({
@@ -612,6 +631,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
       triggers.delete(position.id);
       saveTriggers();
       update(record, { status: "confirmed", tx: result.hash });
+      succeeded = true;
     } catch (error) {
       // Still open: the trigger stays, and the next touch tries again.
       if (pair && store.positions.has(position.id)) triggers.set(position.id, pair);
@@ -619,6 +639,7 @@ export function createEngine({ config, chain, book, source, store, queue, hub, l
       if (!(error instanceof Rejected)) log.warn(`trigger ${position.id.slice(0, 10)} failed: ${error.message}`);
     } finally {
       closing.delete(position.id);
+      if (orderBound && !succeeded) onCloseReleased(position.id);
       forgetLater(record);
       publishTriggers(position.owner, position.id);
     }

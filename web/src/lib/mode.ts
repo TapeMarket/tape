@@ -8,7 +8,9 @@
 const env = import.meta.env;
 const forced = typeof location !== "undefined" && new URLSearchParams(location.search).get("preview") === "1";
 
-export const API_URL: string = (env.VITE_API_URL as string | undefined) ?? (env.DEV ? "http://127.0.0.1:8787" : "");
+const configuredApi = (env.VITE_API_URL as string | undefined) ?? (env.DEV ? "http://127.0.0.1:8787" : "");
+export const LEGACY: boolean = !forced && env.VITE_PREVIEW !== "1" && typeof location !== "undefined" && new URLSearchParams(location.search).get("legacy") === "1" && Boolean(configuredApi);
+export const API_URL: string = LEGACY ? `${configuredApi.replace(/\/v\d+\/?$/, "").replace(/\/$/, "")}/v1` : configuredApi;
 export const PREVIEW: boolean = forced || env.VITE_PREVIEW === "1" || API_URL === "";
 export const BRAND: string = (env.VITE_BRAND as string | undefined) ?? "Tape";
 /** The coin's ticker in preview mode. In live mode it is read from the coin's own contract. */

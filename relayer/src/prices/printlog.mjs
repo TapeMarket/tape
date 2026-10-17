@@ -19,6 +19,7 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { open, readdir, unlink } from "node:fs/promises";
 
 function alive(pid) {
   try {
@@ -46,6 +47,9 @@ export function createPrintLog({ dir, chainId, oracle, signer, keepSeconds = 30 
   const me = signer.toLowerCase();
   let locked = false;
   let lastHour = null;
+  let durableWrites = Promise.resolve();
+  const row = (feedId, print) => ({ signer: me, feedId, time: print.time, prev: print.prev, price: print.price.toString(), conf: print.conf.toString(), blob: print.blob,
+    ...(print.observedAt !== undefined ? { observedAt: print.observedAt, prevObservedAt: print.prevObservedAt } : {}) });
 
   return {
     /** Takes the lock, or throws naming the process that holds it. */
@@ -86,18 +90,19 @@ export function createPrintLog({ dir, chainId, oracle, signer, keepSeconds = 30 
           try {
             const r = JSON.parse(line);
             if (String(r.signer).toLowerCase() !== me || !(r.time >= from)) continue;
-            out.push({ feedId: r.feedId, time: r.time, prev: r.prev, price: BigInt(r.price), conf: BigInt(r.conf), blob: r.blob });
+            out.push({ feedId: r.feedId, time: r.time, prev: r.prev, price: BigInt(r.price), conf: BigInt(r.conf), blob: r.blob,
+              ...(r.observedAt !== undefined ? { observedAt: r.observedAt, prevObservedAt: r.prevObservedAt } : {}) });
           } catch {
             // A line cut short by a crash: the print it held never left the process.
           }
         }
       }
-      return out.sort((a, b) => a.time - b.time);
+      return out.sort((a, b) => (a.observedAt ?? a.time * 1000) - (b.observedAt ?? b.time * 1000));
     },
     /** Writes a print down. It has to return before the print is used for anything. */
     append(feedId, print) {
       const hour = hourOf(print.time);
-      appendFileSync(fileOf(hour), `${JSON.stringify({ signer: me, feedId, time: print.time, prev: print.prev, price: print.price.toString(), conf: print.conf.toString(), blob: print.blob })}\n`);
+      appendFileSync(fileOf(hour), `${JSON.stringify(row(feedId, print))}\n`);
       if (hour === lastHour) return;
       lastHour = hour;
       try {
@@ -108,6 +113,24 @@ export function createPrintLog({ dir, chainId, oracle, signer, keepSeconds = 30 
       } catch {
         // Old files left behind cost disk space and nothing else.
       }
+    },
+    /** Async fsync before a high-resolution public tick is made available for settlement. */
+    appendDurable(feedId, print) {
+      const operation = durableWrites.then(async () => {
+        const hour = hourOf(print.time);
+        const handle = await open(fileOf(hour), "a", 0o600);
+        try { await handle.writeFile(`${JSON.stringify(row(feedId, print))}\n`); await handle.sync(); }
+        finally { await handle.close(); }
+        if (hour !== lastHour) {
+          lastHour = hour;
+          for (const name of await readdir(dir)) {
+            const match = name.startsWith(`${stem}-`) && /-(\d+)\.jsonl$/.exec(name);
+            if (match && Number(match[1]) < hour - 1) await unlink(join(dir, name)).catch(() => {});
+          }
+        }
+      });
+      durableWrites = operation;
+      return operation;
     },
   };
 }

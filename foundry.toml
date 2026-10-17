@@ -27,6 +27,10 @@ runs = 64
 depth = 64
 fail_on_revert = false
 
+[profile.fast]
+optimizer_runs = 1
+optimizer_details = { yulDetails = { optimizerSteps = "dhfoDgvulfnTUtnIf[xa[r]EscLMcCTUtTOntnfDIulLculVcul[j]Tpeulxa[rul]xa[r]cLgvifCTUca[r]LSsTFOtfDnca[r]Iulc]jmul[jul]VcTOculjmul:fDnTOcmu" } }
+
 [fmt]
 line_length = 110
 tab_width = 4

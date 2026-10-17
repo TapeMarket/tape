@@ -52,23 +52,30 @@ The Ethereum core is deployed. The public address record is
 
 | Contract | Ethereum address |
 | --- | --- |
-| Exchange | `0x77DB922a0C4CBB77056243785D00A70676f700C1` |
+| FastExchange | `0x06FDA5DF6C1a8BbC24bF4A2E717302163E23b062` |
 | Pricing | `0xd170144B7b2F6B3423Ac5974F29c1FED4759Cf93` |
-| SignedOracle | `0x61044ECFAe7881cD6557aCcc1b0f18aE31BcbC34` |
+| ExecutionOracle | `0x3c6dcFbcCD0deB7b682492ac89CAB6cCE6538055` |
 | Sessions | `0x2d1dd1980c050E509042Fee55B91184c3979940F` |
-| Lens | `0x6c7951f77bD698A525a07C8E485F22aF70F66387` |
-| Gateway | `0xd94B53ce161C84C0c3F647284f39130DD9eFe474` |
-| Batcher | `0xF569bEC7Ba0B0603483f46EEc47AD947e18C6156` |
-| Deposits | `0xE7B009729349bE8479421f01D11E6882C07a38Fd` |
+| Lens | `0x91490008aa27Be3988B109D22b666537e703F89E` |
+| Gateway | `0x54f7c8DFAaB564957d53f0ecfBa8EdD9F6C8070C` |
+| Batcher | `0x42883d81D4CC1c541B7B728cCd103BC40F35A799` |
+| Deposits | `0x937292c6D7F8dB3784c91cE8DFaa6F8352224Ceb` |
 
-`script/Deploy.s.sol` writes the core deployment record. `script/DeployDeposits.s.sol` adds the
-deposit collector. `script/AttachCoin.s.sol` is a separate, optional operation and must not be
-run when deploying only the trading platform.
+The current deployment uses `executionMode: "order-bound"`. Orders receive a fresh signed price
+after intake, without the original exchange's fixed two-second wait. Ethereum confirmation still
+takes time. Pricing and Sessions are reused; the exchange, oracle and four periphery contracts are new.
+`/v2` serves the current API. The original exchange remains available at `/v1` and
+`/trade?legacy=1` for withdrawals. Balances stay in their original contract until their owner withdraws.
+
+`script/Deploy.s.sol` and `script/DeployDeposits.s.sol` build the original delayed variant, useful
+for local development. They do not reproduce the current FastExchange deployment.
+`script/AttachCoin.s.sol` is a separate, optional operation and must not be run when deploying only
+the trading platform. No coin is attached to either exchange.
 
 ## Architecture
 
 ```
-browser --signed orders--> relayer --transactions--> Exchange <-- SignedOracle
+browser --signed orders--> relayer --transactions--> FastExchange <-- ExecutionOracle
    ^                          |  ^                      |         (checks the price signer's signature)
    +----- JSON + one SSE -----+  +-- Hyperliquid's API  +--> LossMining --coin--> loser's wallet
                                     (prices, which the  +--> Staking  (USDC for stakers)
@@ -84,11 +91,13 @@ updates instead; see "Trust" for what the difference is.
 | Contract | What it does |
 | --- | --- |
 | `Exchange.sol` | Balances, positions, settlement, fees, the payout queue. Not upgradeable, and no function touches a trader's balance. |
+| `FastExchange.sol` | Current exchange. Extends Exchange with no fixed execution wait, signed prices bound to each order, and millisecond ordering of entry and subsequent prices. |
 | `base/Intents.sol` | The EIP-712 orders traders sign: `Open`, `Close`, `Withdraw`. An open carries the worst price and the largest size charge it will accept. |
 | `Sessions.sol` | Session keys for one-click trading. A key can trade and can never withdraw. |
 | `libraries/PerpMath.sol` | The bust price, what a position is charged for the size ahead of it, and the value of a close. Mirrored in `shared/math.mjs`; keep the two in step. |
 | `Pricing.sol` | `PerpMath` behind an address. The Exchange is at the size limit of a contract, so it calls its arithmetic instead of carrying it. Pure functions, no storage, no owner; the Exchange can never be pointed at another. |
-| `SignedOracle.sol` | The oracle that ships. A price is a print signed by one key, the price signer; the contract checks the signature and that a fill is the signer's first print at or after its second. The Exchange's owner can replace the signer. Holds nothing. |
+| `ExecutionOracle.sol` | Current oracle. Fill signatures bind the order hash, feed, chain, oracle and observation time. Public Tick signatures price liquidations, triggers and direct exits. The signer remains trusted for price accuracy and quote selection. Holds nothing. |
+| `SignedOracle.sol` | Base oracle and original delayed deployment. A print is signed by the price signer and names its previous publication time. The Exchange's owner can replace the signer. Holds nothing. |
 | `PythOracle.sol` | The alternative (`ORACLE=pyth`): Pyth adapter. `pinned` returns the first print at or after a second. Holds an ETH float for Pyth's fee. No owner. |
 | `LossMining.sol` | `onLoss` sends coin to the loser as the loss settles. Rejected delivery remains reserved for retry; tickets and loss accounting survive. No vesting or owner. |
 | `Staking.sol` | Stake the coin, earn USDC. No lockup, no owner. |
@@ -139,16 +148,16 @@ One Node process (Node 22+, one dependency: viem). It serves the site's exchange
 
 | Part | File | Job |
 | --- | --- | --- |
-| Engine | `src/engine.mjs` | Takes signed orders, checks them the way the contract will, waits for the pinned price, submits. Refuses a stamp that is not the current second or one of the next two, and refuses every order once no price has arrived for 6 s. |
+| Engine | `src/engine.mjs` | Validates signed orders, reserves their funds, takes the first qualifying fresh quote after intake and submits. Current deployments have no fixed execution wait; original deployments retain their pinned two-second pricing. Stale feeds stop new orders. |
 | Transaction queue | `src/chain.mjs` | Two lanes on one key. Trades: one transaction in flight, everything that arrives meanwhile batched into the next through `Batcher.multicall` (up to 40 calls). Deposits and session registrations: a second lane. |
 | Keeper | `src/keeper.mjs` | Busts positions when a print crosses their line. Executes direct close requests. Pays the queue. Pushes staker fees, and runs the sweep of house cash above the cap after it has liquidated everything past its line. Moves each side's open-interest cap to stay about $1B above that side's open interest (it moves the cap once the room has drifted more than 10%). Watches the oracle's ETH float. |
-| Prices | `src/prices/` | `hyperliquid.mjs` in production: Hyperliquid's best bid and ask over its public websocket and REST API, turned into one first print a second per market (plus changes inside the second, which can only bust) and signed by `signer.mjs` with the price signer's key. The coin is read from the market's feed id, never its name. It signs nothing from a quote more than 0.7 s old (late arrival included), when the machine's clock is off, when the book is more than 1% wide, or when the price is more than 1.5% from the configured reference (Hyperliquid's oracle by default). A configured missing or stale reference stops signing. Every print is written to `relayer/data/` before it is used (`printlog.mjs`), so a restart carries the chain on, and a lock file keeps a second relayer from signing with the same key. `dev.mjs` on chain 31337 only: made-up prices that follow a public ticker, signed with an anvil key. `hermes.mjs` for a Pyth deployment. |
+| Prices | `src/prices/` | `hyperliquid.mjs` streams best bid/ask and book updates. `execution.mjs` signs order-bound fills and public ticks for the current deployment; `signer.mjs` supports the original delayed oracle. Feed IDs determine the asset. Old quotes, an unsynchronized clock, wide books and missing or divergent reference prices stop signing. Prints and per-order quotes are durably written before use. Only one process may sign for an oracle; each deployment needs its own data directory. `dev.mjs` is local-chain only, and `hermes.mjs` supports Pyth deployments. |
 | Indexer | `src/indexer.mjs` | Follows events into memory. Rebuilt from the chain's logs on every start. |
 | Sampler | `src/series.mjs` | One sample a minute for the charts, last day kept. |
 | API | `src/server.mjs` | The routes below. |
 
 Persistent state lives under `DATA_DIR` (`relayer/data/` by default, ignored by git): signed-price
-logs, chart samples, usernames, referral bindings/payment history and pending take-profit/stop-loss
+logs, order-bound execution journals, chart samples, usernames, referral bindings/payment history and pending take-profit/stop-loss
 instructions. Keep this directory separate for Tape and back it up. Balances are on-chain, but
 losing this state can lose pending trigger instructions and referral records.
 
@@ -237,11 +246,11 @@ The reference exchange runs on Hyperliquid. These are the places where Ethereum 
   Hyperliquid's order book. So the relayer reads it, signs what it read, and carries the signed
   price on-chain with each trade; `SignedOracle` checks the signature. That makes the price
   signer trusted in a way nothing on Hyperliquid has to be.
-- **A 2-second pinned fill.** An order is stamped with the second it was signed and fills at the
-  first price published at or after that second plus two. Each print names the time of the one
-  before it, which makes that price unique and checkable. The trader knows the fill two seconds
-  after the click even though the transaction lands a block later, and the operator who submits
-  it cannot choose among prices.
+- **A fresh price bound to the order.** After accepting an order, the relayer waits for a fresh
+  venue observation and signs it for that order's hash. A durable journal retains that selection
+  across retries and restarts. The contract checks the binding, feed, signature and time range;
+  it cannot independently prove which venue quote arrived first. There is no fixed two-second
+  wait on the current exchange. Price delivery and Ethereum inclusion still add latency.
 - **Operator-only opens and closes, with direct exits.** Because the price is fixed at signing
   while the transaction lands later, only a trusted submitter (an operator) may land an order, and
   only while it is fresh. If operators stop, a trader still gets out alone through
@@ -254,7 +263,7 @@ The reference exchange runs on Hyperliquid. These are the places where Ethereum 
 - **Gas paid by the relayer.** Opens, closes, permit deposits, withdrawals and session registrations
   are submitted by the operator key. Ordinary USDC transfers are sent by the depositing wallet.
 
-**No free options.** With the price fixed at signing, a trader able to cancel an order before it
+**No free options.** Once a price is selected, a trader able to cancel an order before it
 lands, or to bring a failing one to life, would keep only the orders that moved their way. So
 nothing a trader can call directly changes the fate of an order they have already signed:
 
@@ -338,6 +347,15 @@ The fork test replays guardian-signed Pyth updates lifted out of public mainnet 
 (`tools/fetch-onchain-fixture.mjs`), so it needs no Pyth API key. Pyth's guardian set rotates, so
 each test forks at the block its update comes from; that is why it needs an archive RPC.
 
+The current fast deployment has a separate compiler profile. To reproduce and test its exact
+bytecode, run `npm run test:fast` (builds `deployable/fast` before running the fast-contract tests).
+Use the default profile for the original exchange and its regression suite. Rebuild the fast
+artifacts before running the full suite from a fresh checkout. The standard and fast artifacts
+are kept separately so building reward contracts preserves the fast deployment.
+
+Contract wallets are checked through `ExecutionOracle` on the fast deployment. An ERC-1271
+wallet that restricts signature verification by caller must allow that oracle address.
+
 ## Parameters
 
 Fixed in the contracts:
@@ -346,7 +364,7 @@ Fixed in the contracts:
 | --- | --- |
 | Fee on a win's gain, and house-side fee carved from a loss | 2% |
 | Stakers' share of every fee (the rest goes to the dev recipient) | 50% |
-| Fill: first price at or after the order's timestamp plus | 2 s, and no later than 10 s after that |
+| Current fill | Fresh order-bound quote after intake, within 10 s of the signed timestamp; fixed wait 0 s |
 | An order must land within | 60 s of its timestamp |
 | Win deadband | 0.2 bps of the entry price, in whole price ticks |
 | Impact curve: what a position is charged on while its side is inside the depth; least a large win is cut | 100,000 USDC, 10% |
@@ -391,12 +409,12 @@ nothing else to adjust.
 | Price signer | Sign prices. Every fill, close and bust is at a price it signed. | Send a transaction, move funds, submit an order. But see below: whoever holds it decides what every position is worth. |
 | Anyone | Liquidate and execute a direct close (after the waits above, with the price signer's print for that moment), pay the queue, push staker fees, send dev fees to their recipient, donate to the house | |
 
-**The price signer's key is the first trust in this system.** `SignedOracle` accepts a price for
+**The price signer's key is the first trust in this system.** `ExecutionOracle` accepts a price for
 one reason: that key signed it. It cannot tell a true price from a false one, and there is no
 second signer and no bound on a price. Whoever holds the key can open a position at the market,
 ask for a direct close, and settle it at any price they sign, or bust every position on a side.
 What limits the damage is how fast it is noticed: a guardian pauses opens, and the owner replaces
-the key with `SignedOracle.setSigner`, after which nothing the old key signed counts. The relayer
+the key with `ExecutionOracle.setSigner`, after which nothing the old key signed counts. The relayer
 keeps it apart from the operator's key and never sends it anywhere; it still sits on the same
 server, and a break-in there has both. This is the price of reading Hyperliquid. With
 `ORACLE=pyth` the price is checked on-chain against Pyth's own signatures and no key of ours can
@@ -411,7 +429,7 @@ lives in the relayer. A dishonest or stolen operator key could:
 - let a partner trade on timestamps up to a minute old. That drains the house's cash and puts the
   partner ahead of later winners in the queue, and no admin function can undo a queued claim;
 
-It cannot forge an order, choose among the signer's prices, or take balances or margin, and it
+It cannot forge an order, substitute a quote signed for another order, or take balances or margin, and it
 cannot stop a trader withdrawing their balance directly. Guard that key accordingly, and rotate it
 with `setOperator`.
 
@@ -457,14 +475,15 @@ included. Four things stand against it here:
   that does not grow with size), and it is fixed at open, so nobody's terms move after they are
   in. What a whole side can take from a small push then grows as the logarithm of the side, not
   in step with it, and as the square of the push, which is how the cost of making the push grows.
-  Because the charge is decided when an order lands, and the side can fill in the two seconds
-  before that, every order carries the most it will accept (`impactLimit`, signed like the
+  Because the charge is decided when an order lands, and other orders can land first,
+  every order carries the most it will accept (`impactLimit`, signed like the
   price limit; the site sets it a quarter above what the ticket showed, or one depth deeper where
   that is more) and is refused past it.
 - **Each side of each market is capped**, so there is a most that can ever be open to be paid.
   Only the owner can change a cap or a depth (`setCaps`, `setDepth`); the relayer's key cannot.
-- **An order's price is not the trader's to pick**: the first price at least two seconds
-  after the click, for the open and again for the close. The push has to hold through both.
+- **The relayer selects a fresh price after accepting each order**, for the open and again for
+  the close. This depends on the trusted price signer and cannot prevent manipulation of the
+  venue's own prices. Removing the old fixed delay also removes its extra time requirement on a push.
 
 What does NOT stand against it: the price is one venue's. It is read from Hyperliquid's order
 book, the same single venue the reference exchange read, so a push means moving that one book and not the

@@ -81,6 +81,7 @@ trap 'echo >&2; echo "INSTALL FAILED. The relayer on the server is: $(remote "sy
 
 say() { printf '\n== %s\n' "$*"; }
 [ -s deployments/1.json ] || { echo "deployments/1.json is missing: deploy the exchange first" >&2; exit 1; }
+node -e 'const d=JSON.parse(require("fs").readFileSync("deployments/1.json")); if(d.executionMode === "order-bound") { console.error("This installer is for the original exchange. Preserve the /v1 and /v2 services and support inbox; follow the current-service instructions in LAUNCH.md."); process.exit(1); }'
 for f in operator.key backup-operator.key price-signer.key; do [ -s "$KEYS/$f" ] || { echo "$KEYS/$f is missing" >&2; exit 1; }; done
 
 say "packages and folders on $IP"

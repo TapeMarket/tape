@@ -50,6 +50,7 @@ export function sweepable(house, markets, priceOf) {
 
 export function createKeeper({ config, chain, book, source, store, queue, engine, indexer, log }) {
   const { publicClient, walletClient, addresses, read } = chain;
+  const orderBound = config.executionMode === "order-bound";
   const executing = new Set();
   const minPush = BigInt(Math.round(config.stakerPushMinUsd * 1e6));
   let harvesting = false;
@@ -63,12 +64,14 @@ export function createKeeper({ config, chain, book, source, store, queue, engine
   const requestLive = (position) => position.closeRequestedAt !== 0 && nowSeconds() < position.closeRequestedAt + REQUEST_EXPIRY;
 
   function shouldBust(position, print) {
-    if (position.liquidating || print.time <= position.entryTime) return false;
+    const printAt = orderBound ? print.observedAt : print.time;
+    const entryAt = orderBound ? (position.entryAtMs ?? position.entryTime * 1000 + 999) : position.entryTime;
+    if (position.liquidating || !Number.isFinite(printAt) || printAt <= entryAt) return false;
     if (!crossed(print.price, position.bust, position.isLong)) return false;
     // A close that was priced at or before this print comes first. If its own price is past the
     // trigger the contract busts it anyway.
     const closingAt = engine.closingAt(position.id);
-    if (closingAt !== null && closingAt <= print.time) return false;
+    if (closingAt !== null && closingAt <= printAt) return false;
     // Same for a binding direct close, for as long as it is live.
     if (requestLive(position) && print.time >= position.closeRequestedAt + DIRECT_DELAY) return false;
     return true;
@@ -97,7 +100,8 @@ export function createKeeper({ config, chain, book, source, store, queue, engine
   function rescan(positionId) {
     const position = store.positions.get(positionId);
     if (!position || position.liquidating) return;
-    for (const print of book.between(position.market, position.entryTime, nowSeconds())) {
+    const history = orderBound ? book.betweenMs(position.market, position.entryAtMs ?? position.entryTime * 1000 + 999, book.latest(position.market)?.observedAt ?? Date.now()) : book.between(position.market, position.entryTime, nowSeconds());
+    for (const print of history) {
       if (shouldBust(position, print)) return bust(position, print);
     }
   }

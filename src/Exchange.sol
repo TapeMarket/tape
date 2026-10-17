@@ -157,7 +157,9 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
     uint256 public constant MAX_OPEN_POSITIONS = 200;
 
     /// @notice An intent stamped T executes at the first price published at or after T + this.
-    uint64 public constant EXEC_DELAY = 2;
+    function EXEC_DELAY() public pure virtual returns (uint64) {
+        return 2;
+    }
     /// @notice ...and no later than this many seconds after that.
     uint64 public constant PIN_WINDOW = 10;
     /// @notice An intent must land within this many seconds of its timestamp.
@@ -200,7 +202,7 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
     // Storage
     // ------------------------------------------------------------------------------------------
 
-    Market[] private _markets;
+    Market[] internal _markets;
     mapping(bytes32 id => Position) private _positions;
     mapping(address owner => bytes32[]) private _openIds;
     /// @notice When a binding direct close was requested for a position, or zero.
@@ -491,9 +493,8 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
         if (notional > m.maxNotional) revert NotionalTooLarge();
         if (notional < minNotional) revert NotionalTooSmall();
 
-        uint64 minTime = it.timestamp + EXEC_DELAY;
         (uint64 price, uint64 conf, uint64 publishTime) =
-            oracle.pinned(m.feedId, update, minTime, minTime + PIN_WINDOW);
+            _openPrice(it, id, update);
         if (uint256(conf) * BPS > uint256(price) * m.maxConfBps) revert ConfidenceTooWide();
         if (it.priceLimit != 0 && (it.isLong ? price > it.priceLimit : price < it.priceLimit)) {
             revert PriceLimitExceeded();
@@ -582,8 +583,8 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
         if (p.owner != it.owner) revert NotPositionOwner();
         _requireTradeAuth(it.owner, _hashClose(it), signature, it.timestamp);
         if (block.timestamp > uint256(it.timestamp) + INTENT_TTL) revert IntentExpired();
-        _beforeRequest(it.positionId, it.timestamp + EXEC_DELAY);
-        _settle(it.positionId, p, _closePrice(p, it.timestamp + EXEC_DELAY, update), false);
+        _beforeRequest(it.positionId, it.timestamp + EXEC_DELAY());
+        _settle(it.positionId, p, _intentClosePrice(it, p, update), false);
     }
 
     /// @notice Closes a position on its take-profit or stop-loss: a signed trigger, a print that
@@ -605,13 +606,11 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
         // owner the trigger names.
         _requireTradeAuth(p.owner, _hashTrigger(it), signature, it.timestamp);
         // A print after the trigger was signed, and after the position opened, at or past its price.
-        uint64 from = it.timestamp > p.openTime ? it.timestamp : uint64(p.openTime);
-        (uint64 price,, uint64 touchedAt) =
-            oracle.within(_markets[p.market].feedId, touch, from + 1, type(uint64).max);
+        (uint64 price, uint64 touchedAt) = _triggerTouch(it, p, touch);
         if (it.above ? price < it.price : price > it.price) revert NotTriggered();
         if (block.timestamp > uint256(touchedAt) + INTENT_TTL) revert IntentExpired();
-        _beforeRequest(it.positionId, touchedAt + EXEC_DELAY);
-        _settle(it.positionId, p, _closePrice(p, touchedAt + EXEC_DELAY, update), false);
+        _beforeRequest(it.positionId, touchedAt + EXEC_DELAY());
+        _settle(it.positionId, p, _triggerPrice(p, price, touchedAt, update), false);
     }
 
     // ------------------------------------------------------------------------------------------
@@ -661,7 +660,7 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
             price = m.frozenPrice;
         } else {
             uint64 publishTime;
-            (price,, publishTime) = oracle.within(m.feedId, update, uint64(p.openTime) + 1, type(uint64).max);
+            (price, publishTime) = _liquidationPrice(id, p, update);
             // A touch at or after the moment a binding close is priced comes too late.
             _beforeRequest(id, publishTime);
             if (!isOperator[msg.sender] && block.timestamp <= uint256(publishTime) + INTENT_TTL) {
@@ -927,6 +926,49 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
         if (requestedAt != 0 && pinTime >= requestedAt + DIRECT_DELAY) revert CloseHasPriority();
     }
 
+    function _openPrice(OpenIntent calldata it, bytes32, bytes[] calldata update)
+        internal
+        virtual
+        returns (uint64 price, uint64 conf, uint64 publishTime)
+    {
+        uint64 minTime = it.timestamp + EXEC_DELAY();
+        return oracle.pinned(_markets[it.market].feedId, update, minTime, minTime + PIN_WINDOW);
+    }
+
+    function _intentClosePrice(CloseIntent calldata it, Position memory p, bytes[] calldata update)
+        internal
+        virtual
+        returns (uint64)
+    {
+        return _closePrice(p, it.timestamp + EXEC_DELAY(), update);
+    }
+
+    function _triggerPrice(Position memory p, uint64, uint64 touchedAt, bytes[] calldata update)
+        internal
+        virtual
+        returns (uint64)
+    {
+        return _closePrice(p, touchedAt + EXEC_DELAY(), update);
+    }
+
+    function _triggerTouch(TriggerIntent calldata it, Position memory p, bytes[] calldata touch)
+        internal
+        virtual
+        returns (uint64 price, uint64 touchedAt)
+    {
+        uint64 from = it.timestamp > p.openTime ? it.timestamp : uint64(p.openTime);
+        (price,, touchedAt) = oracle.within(_markets[p.market].feedId, touch, from + 1, type(uint64).max);
+    }
+
+    function _liquidationPrice(bytes32, Position memory p, bytes[] calldata update)
+        internal
+        virtual
+        returns (uint64 price, uint64 publishTime)
+    {
+        (price,, publishTime) =
+            oracle.within(_markets[p.market].feedId, update, uint64(p.openTime) + 1, type(uint64).max);
+    }
+
     function _closePrice(Position memory p, uint64 minTime, bytes[] calldata update)
         private
         returns (uint64 price)
@@ -1146,7 +1188,7 @@ contract Exchange is Intents, Ownable2Step, ReentrancyGuardTransient {
         queueHead = head;
     }
 
-    function _removePosition(bytes32 id, Position memory p) private {
+    function _removePosition(bytes32 id, Position memory p) internal virtual {
         bytes32[] storage ids = _openIds[p.owner];
         uint256 last = ids.length - 1;
         if (p.index != last) {

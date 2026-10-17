@@ -8,7 +8,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
-const CONTRACTS = ["Exchange", "Sessions", "Lens", "Gateway", "Deposits", "Batcher", "Sweeper", "SignedSweeper", "Staking", "LossMining", "Jackpot", "Coin", "PythOracle", "SignedOracle"];
+const CONTRACTS = ["Exchange", "FastExchange", "ExecutionOracle", "Sessions", "Lens", "Gateway", "Deposits", "Batcher", "Sweeper", "SignedSweeper", "Staking", "LossMining", "Jackpot", "Coin", "PythOracle", "SignedOracle"];
 const OUT = (process.env.FOUNDRY_OUT ?? "out").replace(/\/+$/, "");
 
 mkdirSync(new URL("../abi/", import.meta.url), { recursive: true });

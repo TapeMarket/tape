@@ -39,13 +39,19 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
-const DIR = join(ROOT, "deployable");
+const FAST = process.argv.includes("--fast");
+const DIR = join(ROOT, "deployable", ...(FAST ? ["fast"] : []));
+if (FAST) {
+  process.env.FOUNDRY_PROFILE = "fast";
+  process.env.FOUNDRY_OUT ??= "out-fast";
+  process.env.FOUNDRY_CACHE_PATH ??= "cache-fast";
+}
 const PROJECT_OUT = (process.env.FOUNDRY_OUT ?? "out").replace(/\/+$/, "");
 const CHECK = process.argv.includes("--check");
 const FORGE = process.argv.includes("--forge");
@@ -54,7 +60,7 @@ const SIZE_LIMIT = 24_576;
 const SIZE_WARNING = 200;
 
 // Everything script/Deploy.s.sol and script/AttachCoin.s.sol create.
-const CONTRACTS = [
+const CONTRACTS = FAST ? ["src/FastExchange.sol:FastExchange", "src/ExecutionOracle.sol:ExecutionOracle"] : [
   "src/Exchange.sol:Exchange",
   "src/Pricing.sol:Pricing",
   "src/SignedOracle.sol:SignedOracle",
@@ -104,7 +110,7 @@ if (FORGE) {
   console.log("forge clean, then each contract on its own, then the rest (a few minutes)");
   forge("clean");
   for (const target of CONTRACTS) forge("build", target.split(":")[0]);
-  forge("build");
+  if (!FAST) forge("build");
 }
 
 const scratch = mkdtempSync(join(tmpdir(), "deployable-"));
@@ -193,8 +199,12 @@ if (CHECK) {
     failed = true;
   }
 } else if (!failed) {
-  rmSync(DIR, { recursive: true, force: true });
   mkdirSync(DIR, { recursive: true });
+  // The standard build and the fast build share a parent, but use different compiler profiles.
+  // Rebuilding reward contracts must preserve deployable/fast and its exact deployed bytecode.
+  for (const entry of readdirSync(DIR, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".json")) rmSync(join(DIR, entry.name));
+  }
   for (const [name, text] of files) writeFileSync(join(DIR, name), text);
 }
 

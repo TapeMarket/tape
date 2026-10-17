@@ -7,7 +7,8 @@ import { syncSession } from "./lib/actions";
 import { getState, setState, useStore } from "./lib/store";
 import { loadDayOpen } from "./lib/preview/feed";
 import { coinOf } from "./lib/hl";
-import { PREVIEW } from "./lib/mode";
+import { LEGACY, PREVIEW } from "./lib/mode";
+import { PreviousExchange } from "./components/PreviousExchange";
 
 const ROUTES: Record<string, ComponentType> = {};
 for (const [path, load] of Object.entries(PAGE_LOADERS)) ROUTES[path] = lazy(load);
@@ -46,7 +47,7 @@ export default function ExchangeApp() {
     if (!ready) return;
     // Quotes start immediately; restoring a slow wallet does not hold the stream up.
     void connectStream();
-    syncSession();
+    if (!LEGACY) syncSession();
     loadAccount().catch(() => {});
     loadHistory().catch(() => {});
   }, [owner, ready]);
@@ -55,6 +56,7 @@ export default function ExchangeApp() {
   return <div className="app">
     <TopBar />
     <Banner />
+    <PreviousExchange />
     <main className="page"><Suspense fallback={<div className="empty" role="status">Loading page…</div>}>
       {ready ? <Page /> : <div className="empty" role="status" style={{ minHeight: "50vh", display: "grid", placeContent: "center", gap: 16, textAlign: "center" }}>
         <span>{offline ? "The exchange is unreachable. Reconnecting…" : "Connecting to Tape…"}</span>

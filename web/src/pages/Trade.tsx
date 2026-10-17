@@ -249,7 +249,7 @@ function StatusTab() {
       </div>
       <div className="kv">
         <span>Fill delay</span>
-        <span>{config.timing.execDelay}s after you click</span>
+        <span>{config.timing.execDelay === 0 ? "Next fresh price · no fixed wait" : `${config.timing.execDelay}s after you click`}</span>
       </div>
       {status.chainId !== 0 && (
         <div className="kv">

@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 import { depositPinFrom } from "../deployment-pin.mjs";
 const site=process.argv.find(a=>a.startsWith('http'))??'https://tapemarket.io';
 const local=process.argv.includes('--local');
-const api='https://api.tapemarket.io', owner='0x1000000000000000000000000000000000000001';
+const api='https://api.tapemarket.io/v2', owner='0x1000000000000000000000000000000000000001';
 const deployment=JSON.parse(readFileSync(new URL('../../deployments/1.json',import.meta.url),'utf8'));
 const pin=depositPinFrom(deployment);
 const bundled=await build({entryPoints:[fileURLToPath(new URL('../src/lib/deposits.ts',import.meta.url))],bundle:true,write:false,format:'esm',platform:'node',define:{__MAINNET_DEPOSITS__:JSON.stringify(pin)},logLevel:'silent'});
@@ -53,7 +53,7 @@ try {
   let wrong=false;const transfers=[];
   const history=()=>({transfers,trades:[],staking:[],queue:[],emissions:[]});
   await context.route(`${api}/**`,async route=>{
-    const request=route.request(),url=new URL(request.url()),path=url.pathname;
+    const request=route.request(),url=new URL(request.url()),path=url.pathname.replace(/^\/v2/, '');
     if(request.method()!=='GET'){writes.push(path);return route.abort();}
     if(path===`/account/${owner}`)return route.fulfill({json:{address:owner,blockNumber:'100',name:null,balance:transfers.length?'125000000':'100000000',queued:'0',reserved:'0',marginInUse:'0',positions:[],intents:[],claims:[],coin:null,withdrawRequest:null,wallet:{usdc:'500456789',eth:'100000000000000',usdcNonce:'0'},stats:{},badges:[]}});
     if(path===`/history/${owner}`){await historyReady;return route.fulfill({json:history()});}

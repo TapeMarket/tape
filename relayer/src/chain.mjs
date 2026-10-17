@@ -54,7 +54,7 @@ export function createChain(config) {
   const d = config.deployment;
   if (!d.batcher) throw new Error("The deployment file has no batcher address. It was written by an older deploy script: redeploy.");
   const abis = {
-    exchange: loadAbi("Exchange"),
+    exchange: [...loadAbi("Exchange"), ...(config.executionMode === "order-bound" ? parseAbi(["event PositionPricingTime(bytes32 indexed id, uint64 observedAt)"]) : [])],
     sessions: loadAbi("Sessions"),
     lens: loadAbi("Lens"),
     gateway: loadAbi("Gateway"),

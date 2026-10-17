@@ -15,6 +15,7 @@ import { BaseError, ContractFunctionRevertedError } from "viem";
 import { createHyperliquidSource, createCoinbaseReference, createOracleReference, coinOfFeed } from "./prices/hyperliquid.mjs";
 import { createPrintLog } from "./prices/printlog.mjs";
 import { createPrintSigner, SIGNED_ORACLE_ABI } from "./prices/signer.mjs";
+import { createExecutionSigner, createExecutions } from "./prices/execution.mjs";
 import { createEngine } from "./engine.mjs";
 import { createKeeper } from "./keeper.mjs";
 import { createDepositWatcher } from "./deposits.mjs";
@@ -39,6 +40,8 @@ if (actualChainId !== config.chainId) {
   throw new Error(`RPC is chain ${actualChainId} but CHAIN_ID is ${config.chainId}.`);
 }
 const signedPrices = config.oracleKind === "signed";
+const orderBound = config.executionMode === "order-bound";
+if (orderBound && (!signedPrices || config.priceSource !== "hyperliquid")) throw new Error("Order-bound execution requires the Hyperliquid ExecutionOracle deployment.");
 if (!["dev", "hermes", "hyperliquid"].includes(config.priceSource)) {
   throw new Error(`PRICE_SOURCE is "${config.priceSource}": it is dev, hermes or hyperliquid.`);
 }
@@ -61,7 +64,7 @@ if (exchangeOracle.toLowerCase() !== chain.addresses.oracle.toLowerCase()) {
 let signer = null;
 if (signedPrices) {
   if (!config.priceSignerKey) throw new Error("Set PRICE_SIGNER_KEY or PRICE_SIGNER_KEY_FILE: this deployment's prices are signed by its price signer.");
-  signer = createPrintSigner({ privateKey: config.priceSignerKey, chainId: config.chainId, oracle: chain.addresses.oracle });
+  signer = (orderBound ? createExecutionSigner : createPrintSigner)({ privateKey: config.priceSignerKey, chainId: config.chainId, oracle: chain.addresses.oracle });
   const expected = await chain.publicClient.readContract({ address: chain.addresses.oracle, abi: SIGNED_ORACLE_ABI, functionName: "signer" });
   if (expected.toLowerCase() !== signer.address.toLowerCase()) {
     throw new Error(`The oracle takes prices signed by ${expected}; the price signer key given is ${signer.address}'s. Give the right key, or have the owner call setSigner.`);
@@ -80,8 +83,9 @@ if (chain.operators.length > 1) log.info(`gas: ${chain.operators.length} operato
 // stamps orders with them too). They have to be the same numbers.
 for (const [name, expected] of Object.entries(RULES)) {
   const actual = await chain.read("exchange", name);
-  if (BigInt(actual) !== BigInt(expected)) {
-    throw new Error(`The Exchange says ${name} is ${actual}; shared/ says ${expected}. This relayer was not built for this deployment.`);
+  const rule = name === "EXEC_DELAY" && orderBound ? 0 : expected;
+  if (BigInt(actual) !== BigInt(rule)) {
+    throw new Error(`The Exchange says ${name} is ${actual}; this execution mode expects ${rule}. This relayer was not built for this deployment.`);
   }
 }
 
@@ -126,6 +130,7 @@ const source =
           markets,
           book,
           signer,
+          orderBound,
           log,
           // Every print goes to disk before it is used, and a restart carries on from there.
           printLog: createPrintLog({ dir: config.dataDir, chainId: config.chainId, oracle: chain.addresses.oracle, signer: signer.address }),
@@ -193,7 +198,8 @@ if (signer) {
   }, 20_000).unref();
 }
 
-const engine = createEngine({ config, chain, book, source, store, queue, hub, log });
+const executions = orderBound ? await createExecutions({ dir: config.dataDir, chainId: config.chainId, oracle: chain.addresses.oracle, signer, source }) : null;
+const engine = createEngine({ config, chain, book, source, store, queue, hub, log, executions, onPricedOpen: id => keeper.rescan(id), onCloseReleased: id => keeper.rescan(id) });
 const keeper = createKeeper({ config, chain, book, source, store, queue, engine, indexer, log });
 const sampler = createSampler({ config, chain, store, book, log });
 // A deposit lands in the Exchange's own event like any other; pick it up at once.
@@ -207,8 +213,9 @@ late.engine = engine;
 late.api = api;
 
 // After any close, give the keeper a chance to pay the queue.
-hooks.onEvent = (eventName) => {
+hooks.onEvent = (eventName, args) => {
   if (eventName === "PositionClosed") setTimeout(() => keeper.harvest(), 50);
+  if (orderBound && eventName === "PositionOpened") keeper.rescan(args.id);
 };
 // One of our transactions settled: pick its events up now rather than at the next poll. And if a
 // close fell through, re-check the position for a bust touch that was skipped on its account.
@@ -217,7 +224,7 @@ hooks.onSettled = (job, result) => {
   if (!result.ok && job.functionName === "close") keeper.rescan(job.args[0].positionId);
 };
 
-source.start();
+if (!config.readOnlyOpens || store.positions.size > 0) source.start();
 keeper.start();
 deposits.start();
 sampler.start();

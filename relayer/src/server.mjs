@@ -169,10 +169,11 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
       chainId: config.chainId,
       time: Date.now(),
       priceSource: source.name,
+      ...(d.previousExchange ? { previousExchange: d.previousExchange } : {}),
       addresses,
       usdcPermit: { name: d.usdcPermitName ?? "USD Coin", version: d.usdcPermitVersion ?? "2" },
       timing: {
-        execDelay: EXEC_DELAY,
+        execDelay: config.executionMode === "order-bound" ? 0 : EXEC_DELAY,
         pinWindow: PIN_WINDOW,
         intentTtl: INTENT_TTL,
         directDelay: DIRECT_DELAY,
@@ -183,7 +184,7 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
       markets: store.markets.map((m) => ({ ...m, price: book.latest(m.id)?.price ?? null, ref24h: sampler.reference(m.id) })),
       minMargin: store.house?.minMargin ?? 0n,
       minNotional: store.house?.minNotional ?? 0n,
-      opensPaused: store.house?.opensPaused ?? false,
+      opensPaused: config.readOnlyOpens || (store.house?.opensPaused ?? false),
       coin: addresses.coin ? { address: addresses.coin, staking: addresses.staking, lossMining: addresses.lossMining, symbol: d.coinSymbol ?? "COIN" } : null,
       tape: store.tape.slice(0, 40),
     };
