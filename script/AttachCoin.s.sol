@@ -43,6 +43,7 @@ import {Deployable} from "./Deployable.sol";
 ///        COIN             existing coin (route A)                            unset = route B
 ///        COIN_NAME        route B: token name                                "Tape"
 ///        COIN_SYMBOL      route B: ticker                                    "TAPE"
+///        EXPECTED_COIN    optional predicted route C address; a mismatch stops simulation
 ///        COIN_SUPPLY      route B: whole supply, 18 decimals                 1,000,000,000
 ///        RESERVE          coin sent to loss mining, in the coin's units      B/C: 20% of COIN_SUPPLY
 ///                                                                            A: required
@@ -136,7 +137,8 @@ contract AttachCoin is Script {
             coin = Deployable.create("Coin", abi.encode(coinName, coinSymbol, supply, deployer));
             // Constructor arguments are handed over as bytes, so nothing but this checks them.
             require(
-                keccak256(bytes(Coin(coin).symbol())) == keccak256(bytes(coinSymbol))
+                keccak256(bytes(Coin(coin).name())) == keccak256(bytes(coinName))
+                    && keccak256(bytes(Coin(coin).symbol())) == keccak256(bytes(coinSymbol))
                     && Coin(coin).totalSupply() == supply && Coin(coin).balanceOf(deployer) == supply,
                 "the coin was not built with the arguments given"
             );
@@ -239,10 +241,13 @@ contract AttachCoin is Script {
         coin = Deployable.create(
             "LaunchCoin", abi.encode(coinName, coinSymbol, supply, reserve, deployer, maxWalletBps, deployer)
         );
+        address expectedCoin = vm.envOr("EXPECTED_COIN", address(0));
+        require(expectedCoin == address(0) || coin == expectedCoin, "coin address changed: review deployer nonce and transaction order");
         LaunchCoin made = LaunchCoin(coin);
         // Constructor arguments are handed over as bytes, so nothing but this checks them.
         require(
-            keccak256(bytes(made.symbol())) == keccak256(bytes(coinSymbol)) && made.totalSupply() == supply
+            keccak256(bytes(made.name())) == keccak256(bytes(coinName))
+                && keccak256(bytes(made.symbol())) == keccak256(bytes(coinSymbol)) && made.totalSupply() == supply
                 && made.balanceOf(deployer) == reserve && made.balanceOf(coin) == supply - reserve
                 && made.poolSupply() == supply - reserve && made.maxWallet() == supply * maxWalletBps / 10_000
                 && made.owner() == deployer && made.limitsInEffect() == (maxWalletBps != 0)

@@ -88,6 +88,7 @@ contract LaunchCoinTest is Base {
     function test_supply_isSplitBetweenTheReserveAndThePool() public view {
         assertEq(lc.totalSupply(), SUPPLY);
         assertEq(lc.decimals(), 18);
+        assertEq(lc.name(), "Tape");
         assertEq(lc.symbol(), "TAPE");
         assertEq(lc.balanceOf(holder), RESERVE, "the mining reserve");
         assertEq(lc.balanceOf(address(lc)), SUPPLY - RESERVE, "the pool's part waits inside the coin");
