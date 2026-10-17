@@ -65,7 +65,7 @@ function Quote({ id, symbol, ref24h }: { id: number; symbol: string; ref24h?: nu
   const change = ref24h && now ? now / ref24h - 1 : null;
   return (
     <a
-      href="/trade"
+      href={LEGACY ? "/trade?legacy=1" : "/trade"}
       className="quote"
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;

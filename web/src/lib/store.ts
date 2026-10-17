@@ -117,6 +117,14 @@ export function toast(kind: Toast["kind"], title: string, body?: string): void {
 
 /** Moves to `to`, which may carry a query string. Routing only looks at the path. */
 export function navigate(to: string): void {
+  // Market shortcuts and portfolio tabs also navigate without a Link component. Keep them
+  // on the same contract after a reload, just like the main navigation's legacy links.
+  const current = new URLSearchParams(location.search);
+  if (current.get("legacy") === "1" && current.get("preview") !== "1") {
+    const target = new URL(to, "https://tape.invalid");
+    target.searchParams.set("legacy", "1");
+    to = target.pathname + target.search + target.hash;
+  }
   const [path] = to.split("?");
   if (to === location.pathname + location.search) return;
   const changedPage = path !== state.path;
