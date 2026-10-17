@@ -1,7 +1,8 @@
 // Production-build preview checks. Market data is deterministic; no chain or real funds.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 const site = process.argv.find((a) => a.startsWith("http")) ?? "http://127.0.0.1:4173";
 const capture = !process.argv.includes("--no-shots");
@@ -13,6 +14,13 @@ const browser = await chromium.launch();
 let passed = 0;
 async function check(name, fn) { await fn(); console.log(`ok ${++passed}: ${name}`); }
 async function fixture(context) {
+  if (process.argv.includes("--local")) await context.route(`${site}/**`, route => {
+    const path = new URL(route.request().url()).pathname;
+    const root = fileURLToPath(new URL(path.startsWith("/img/") ? "../public/" : "../dist/", import.meta.url));
+    const file = resolve(root, /^\/(assets|img)\//.test(path) ? path.slice(1) : "index.html");
+    assert.ok(file.startsWith(resolve(root) + sep));
+    return existsSync(file) ? route.fulfill({ path: file }) : route.fulfill({ status: 404 });
+  });
   await context.route("https://api.hyperliquid.xyz/info", async (route) => {
     const b = route.request().postDataJSON();
     const names = Object.keys(prices).filter((coin) => coin.includes(":") === Boolean(b.dex));
@@ -62,7 +70,7 @@ try {
   await check("invalid leverage disables trading", async () => { await page.locator("#margin").fill("100"); await page.locator("#leverage").fill("2.5"); await page.waitForFunction(() => document.querySelector(".slip-go")?.disabled); await page.locator("#leverage").fill("100"); await page.locator("#margin").click(); });
   await check("order opens, closes and enters history", async () => { await page.locator(".slip-go").click(); await page.locator(".strip").waitFor({ timeout: 15000 }); assert.equal(await page.locator(".strip").count(), 1); await page.locator(".strip").getByRole("button", { name: "Close", exact: true }).click(); await page.locator(".strip").waitFor({ state: "detached", timeout: 15000 }); await page.getByRole("tab", { name: "History", exact: true }).click(); await page.locator(".tt-book tbody tr").waitFor(); assert.equal(await page.locator(".tt-book tbody tr").count(), 1); });
   await check("withdraw and deposit move practice cash correctly", async () => {
-    await page.locator(".wallet-main").click(); await page.getByRole("button", { name: "Withdraw", exact: true }).click(); let d = page.getByRole("dialog", { name: "Withdraw USDC" }); await d.getByLabel("Amount in USDC").fill("50"); await d.getByRole("button", { name: "Withdraw", exact: true }).click(); await d.waitFor({ state: "detached" }); assert.match(await page.locator(".wallet-main").innerText(), /9,950/);
+    await page.locator(".wallet-withdraw").click(); let d = page.getByRole("dialog", { name: "Withdraw USDC" }); await d.getByLabel("Amount in USDC").fill("50"); await d.getByRole("button", { name: "Withdraw", exact: true }).click(); await d.getByText("Back in your wallet.", { exact: true }).waitFor(); await d.getByRole("button", { name: "Done", exact: true }).click(); await d.waitFor({ state: "detached" }); assert.match(await page.locator(".wallet-main").innerText(), /9,950/);
     await page.getByRole("button", { name: "Deposit", exact: true }).click(); d = page.getByRole("dialog", { name: "Deposit USDC" }); await d.getByLabel("Amount in USDC").fill("50"); await d.getByRole("button", { name: "Deposit", exact: true }).click(); await d.getByText("Deposit received.", { exact: true }).waitFor(); await d.getByRole("button", { name: "Back to trading", exact: true }).click(); await d.waitFor({ state: "detached" }); assert.match(await page.locator(".wallet-main").innerText(), /10,000/);
   });
   await check("dialog Escape restores keyboard focus", async () => { await page.getByRole("button", { name: "Deposit", exact: true }).click(); await page.getByRole("dialog").waitFor(); await page.keyboard.press("Escape"); assert.equal(await page.getByRole("dialog").count(), 0); assert.equal(await page.getByRole("button", { name: "Deposit", exact: true }).evaluate((el) => el === document.activeElement), true); });

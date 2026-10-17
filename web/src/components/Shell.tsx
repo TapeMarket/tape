@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { claimUsername, withdraw } from "../lib/actions";
+import { claimUsername } from "../lib/actions";
 import { post } from "../lib/api";
-import { amountTyped, big, parseUsd, percent, price, priceNumber, shortAddress, usdDown, usdInput, usdNumber } from "../lib/format";
+import { big, percent, price, priceNumber, shortAddress, usdDown, usdNumber } from "../lib/format";
 import { BRAND, PREVIEW } from "../lib/mode";
 import { navigate, setState, toast, useStore } from "../lib/store";
 import { connectWith, disconnect, walletOptions, type WalletOption } from "../lib/wallet";
@@ -11,6 +11,7 @@ import { Wordmark } from "./Wordmark";
 import { Link } from "./Link";
 import { Dialog } from "./Dialog";
 import DepositDialog from "./Deposit";
+import WithdrawDialog from "./Withdraw";
 export { Dialog } from "./Dialog";
 export { Link } from "./Link";
 
@@ -190,6 +191,10 @@ export function TopBar() {
               <hr className="menu-rule" />
               <button onClick={disconnect}>Disconnect</button>
             </Popover>
+            <button className="wallet-withdraw" onClick={() => setState({ dialog: "withdraw" })} aria-label="Withdraw" title="Withdraw">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5" /></svg>
+              <span className="hide-narrow">Withdraw</span>
+            </button>
             <button className="wallet-add" onClick={() => setState({ dialog: "deposit" })} aria-label="Deposit" title="Deposit">
               <span aria-hidden="true">+</span>
               <span className="hide-narrow">Deposit</span>
@@ -352,32 +357,6 @@ function ConnectDialog() {
   );
 }
 
-function WithdrawDialog() {
-  const account = useStore(s => s.account);
-  const offline = useStore(s => s.offline);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const locked = useRef(false);
-  const free = big(account?.balance) - big(account?.reserved);
-  const max = free > 0n ? free : 0n;
-  const amount = parseUsd(text);
-  const disabled = busy || !!offline || !amount || amount > max;
-  const label = offline ? "Offline" : !amount ? "Enter an amount" : amount > max ? "More than your free balance" : busy ? "Waiting for your signature" : "Withdraw";
-  return <Dialog title="Withdraw USDC">
-    <div className="kv"><span>Free balance</span><span>{usdDown(max)}</span></div>
-    <div className="field-row"><img src="/img/usdc.png" alt="" width="20" height="20" />
-      <input className="input" style={{ height: 36, fontSize: 15 }} autoFocus inputMode="decimal" aria-label="Amount in USDC" placeholder="0" value={text} onChange={event => setText(amountTyped(text, event.target.value, event.nativeEvent as InputEvent))} />
-      <button className="chip" style={{ height: 36 }} onClick={() => setText(usdInput(max))}>Max</button>
-    </div>
-    <button className="btn primary big wide" disabled={disabled} onClick={async () => {
-      if (disabled || !amount || locked.current) return;
-      locked.current = true; setBusy(true);
-      try { if (await withdraw(amount)) setState({ dialog: null }); } finally { locked.current = false; setBusy(false); }
-    }}>{label}</button>
-    <p className="note">{PREVIEW ? "Moves between this account's wallet and the exchange." : "You sign with your wallet and the USDC goes straight to it. Margin in open positions and queued winnings stay where they are."}</p>
-  </Dialog>;
-}
-
 function UsernameDialog() {
   const current = useStore((s) => s.account?.name);
   const [text, setText] = useState(current ?? "");
@@ -419,7 +398,7 @@ export function Dialogs() {
   if (dialog === "connect") return <ConnectDialog />;
   // Ready with the exchange shell: opening a money action must not wait for another script.
   if (dialog === "deposit") return <DepositDialog key={owner} />;
-  if (dialog === "withdraw") return <WithdrawDialog />;
+  if (dialog === "withdraw") return <WithdrawDialog key={owner} />;
   if (dialog === "username") return <UsernameDialog />;
   if (dialog === "share") return <ShareDialog />;
   return null;

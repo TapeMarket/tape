@@ -2707,6 +2707,10 @@ p {
 .deposit-methods button:hover { color: var(--blue); }
 .deposit-methods svg { width: 17px; height: 17px; flex: none; }
 .deposit-panel { min-width: 0; }
+.withdraw-destination { display: grid; gap: 7px; margin: 0 0 4px; padding: 14px 16px; background: var(--tint); border-radius: 8px; }
+.withdraw-destination > span { font-size: 12px; color: var(--ink-2); }
+.withdraw-destination > strong { font-size: 12px; font-weight: 550; line-height: 1.6; overflow-wrap: anywhere; }
+.withdraw-dialog .deposit-complete .deposit-primary { margin-top: 16px; }
 .deposit-wallet { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
 .deposit-wallet > :last-child { text-align: right; }
 .deposit-amount { display: block; padding: 16px 18px 14px; border: 1px solid var(--line-2); border-radius: 12px; cursor: text; }
@@ -2791,6 +2795,8 @@ p {
   .deposit-dialog .dialog-head .close-x { min-width: 44px; min-height: 44px; }
 }
 @media (max-width: 360px) {
+  .wallet-dot { display: none; }
+  .wallet-main { padding-left: 14px; }
   .deposit-dialog .dialog-head, .deposit-dialog .dialog-body { padding-inline: 16px; }
   .deposit-methods button { gap: 4px; font-size: 11px; }
   .deposit-amount input { font-size: 38px; }
@@ -5240,6 +5246,9 @@ p {
   font-weight: 600;
   transition: background 0.15s;
 }
+
+.wallet-withdraw { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; background: #fff; color: var(--ink); border-left: 1px dashed var(--line-2); font-size: 12px; font-weight: 550; transition: background .15s; }
+.wallet-withdraw:hover { background: var(--blue-soft); color: var(--blue); }
 
 .wallet-add span:first-child {
   font: 600 17px/1 var(--mono);

@@ -8,6 +8,7 @@ import { parseEventLogs } from "viem";
 import { bustPrice } from "../../shared/math.mjs";
 import { DIRECT_DELAY } from "../../shared/eip712.mjs";
 import { acct, lower } from "./util.mjs";
+import { readAccountSnapshot, balanceSnapshot } from "./account-balance.mjs";
 
 const CHUNK = 5_000n;
 const MAX_TRADES = 5_000;
@@ -99,7 +100,7 @@ export function liveClaims(store) {
   return out;
 }
 
-export function createIndexer({ config, chain, store, hub, log, onEvent = () => {}, onTrade = () => {} }) {
+export function createIndexer({ config, chain, store, hub, log, onEvent = () => {}, onTrade = () => {}, reservedOf = () => 0n }) {
   const { publicClient, abis, addresses, read } = chain;
   const watched = [addresses.exchange, addresses.lossMining, addresses.staking].filter(Boolean);
   const eventAbi = [...abis.exchange, ...abis.lossMining, ...abis.staking].filter((item) => item.type === "event");
@@ -107,6 +108,7 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
   const blockTimes = new Map();
   let timer = null;
   let running = false;
+  let live = false;
 
   async function timeOf(blockNumber) {
     if (!blockTimes.has(blockNumber)) {
@@ -197,7 +199,7 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
     note(store.coin.events, entry, MAX_COIN_EVENTS);
   }
 
-  async function apply(logEntry) {
+  async function apply(logEntry, balances) {
     const { eventName, args } = logEntry;
     const time = await timeOf(logEntry.blockNumber);
     const tx = logEntry.transactionHash;
@@ -284,7 +286,10 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
 
         const chip = { type: "close", id: args.id, owner: args.owner, market: trade.market, isLong: trade.isLong, pnl: args.pnl, busted, time };
         note(store.tape, chip, MAX_TAPE);
-        hub.publish(acct(args.owner), "closed", trade);
+        // The close and its actual spendable balance reach the trader in the same event.
+        // Never infer this from quoted PnL: some wins can be queued instead of credited.
+        const snapshot = balances?.get(lower(args.owner));
+        hub.publish(acct(args.owner), "closed", { ...trade, accountBalance: snapshot ? { ...snapshot, reserved: reservedOf(args.owner) } : undefined });
         hub.publish("public", "trade", trade);
         hub.publish("public", "tape", chip);
         break;
@@ -375,7 +380,24 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
   async function pull(fromBlock, toBlock) {
     const logs = await publicClient.getLogs({ address: watched, fromBlock, toBlock });
     const parsed = parseEventLogs({ abi: eventAbi, logs, strict: false }).filter((l) => l.eventName);
-    for (const entry of parsed) await apply(entry);
+    const balances = new Map();
+    if (live) {
+      const owners = new Map(parsed.filter(l => l.eventName === "PositionClosed").map(l => [lower(l.args.owner), l.args.owner]));
+      // One read per affected wallet, even when several positions close in the same batch.
+      await Promise.all([...owners].map(async ([key, owner]) => {
+        let timeout;
+        try {
+          const snapshot = await Promise.race([
+            readAccountSnapshot(chain, owner, toBlock),
+            new Promise((_, reject) => { timeout = setTimeout(() => reject(Error("balance read timed out; refreshing separately")), 1500); }),
+          ]);
+          balances.set(key, balanceSnapshot(owner, snapshot));
+        }
+        catch (error) { log.warn(`settlement balance: ${error.shortMessage ?? error.message}`); }
+        finally { clearTimeout(timeout); }
+      }));
+    }
+    for (const entry of parsed) await apply(entry, balances);
     return parsed.length;
   }
 
@@ -431,6 +453,7 @@ export function createIndexer({ config, chain, store, hub, log, onEvent = () => 
       }
       if (lastError) throw new Error(`The indexer could not replay the chain's history: ${lastError.shortMessage ?? lastError.message}`);
       await Promise.all([refreshMarkets(), refreshHouse()]);
+      live = true;
       log.info(`indexer: caught up to block ${store.block}, ${store.positions.size} open positions, ${store.trades.length} trades`);
       timer = setInterval(tick, config.pollMs);
     },

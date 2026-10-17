@@ -32,6 +32,7 @@
     "test:live:core": "node web/e2e/live-core.mjs",
     "test:loading": "node web/e2e/loading.mjs",
     "test:deposit-ui": "node web/e2e/deposits.mjs",
+    "test:withdraw-ui": "node web/e2e/withdrawals.mjs",
     "test:deposit-live": "node web/e2e/deposit-live.mjs",
     "test:performance": "node web/e2e/performance.mjs",
     "test:platform:pages": "node web/e2e/platform-pages.mjs",

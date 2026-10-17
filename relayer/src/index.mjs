@@ -109,7 +109,7 @@ const referrals = createReferrals({
 });
 /** Set once the API exists (it knows the usernames). Trades replayed before then are history, not news. */
 let feed = { onTrade() {}, onJackpot() {}, alert() {} };
-const indexer = createIndexer({ config, chain, store, hub, log, onEvent: (...args) => hooks.onEvent(...args), onTrade: (trade) => {
+const indexer = createIndexer({ config, chain, store, hub, log, reservedOf: owner => late.engine?.reservedOf(owner) ?? 0n, onEvent: (...args) => hooks.onEvent(...args), onTrade: (trade) => {
     referrals.onTrade(trade);
     feed.onTrade(trade);
   } });

@@ -16,6 +16,7 @@ import { getState, serverNow, setState, toast, subscribe } from "./store";
 import { explainWalletError, getSigner } from "./wallet";
 import { checkedDepositAddress } from "./deposits";
 import { depositActive, depositCreditSince, type DepositFlow } from "./deposit-flow";
+import { withdrawActive, type WithdrawFlow } from "./withdraw-flow";
 import { pendingReferral, referralMessage, settleReferral } from "./referral";
 import { REFERRAL_CODE_RULE, referralCodeMessage } from "@shared/referral-code.mjs";
 import type { Account, Address, Hex, History, Intent } from "./types";
@@ -473,28 +474,61 @@ export async function deposit(amount: bigint, bySignature = false): Promise<bool
   }
 }
 
+const withdrawing = new Set<string>();
 export async function withdraw(amount: bigint): Promise<boolean> {
   const signer = getSigner();
-  if (!signer) return false;
+  if (!signer || amount <= 0n) return false;
+  const owner = signer.address, slot = owner.toLowerCase();
+  if (withdrawing.has(slot) || withdrawActive(getState().withdrawFlows[slot]?.stage)) return false;
+  withdrawing.add(slot);
+  const id = Date.now();
+  let submitted = false;
+  setState(s => ({ withdrawFlows: { ...s.withdrawFlows, [slot]: { id, owner, amount: amount.toString(), stage: "preparing", baseline: [] } } }));
+  const progress = (patch: Partial<WithdrawFlow>) => setState(s => {
+    const previous = s.withdrawFlows[slot];
+    if (!previous || previous.id !== id) return {};
+    return { withdrawFlows: { ...s.withdrawFlows, [slot]: { ...previous, ...patch } } };
+  });
+  const stillConnected = () => { if (getState().owner?.toLowerCase() !== slot || getSigner()?.address.toLowerCase() !== slot) throw Error("Your wallet changed. Reopen Withdraw for your connected wallet."); };
   try {
-    if (PREVIEW) await post("/withdraw", { owner: signer.address, to: signer.address, amount });
+    const [fresh, history] = await Promise.all([get<Account>(`/account/${owner}`), get<History>(`/history/${owner}?limit=200`)]);
+    stillConnected();
+    if (amount > BigInt(fresh.balance) - BigInt(fresh.reserved)) throw Error("This is more than your available balance. Choose a smaller amount.");
+    progress({ baseline: history.transfers });
+    let result: { tx?: Hex };
+    if (PREVIEW) {
+      progress({ stage: "submitting" }); submitted = true;
+      result = await post("/withdraw", { owner, to: owner, amount });
+    }
     else {
-      const { withdrawNonce } = await get<Account>(`/account/${signer.address}`);
       const deadline = BigInt(serverNow() + 600);
+      progress({ stage: "wallet" });
       const signature = await signer.signTypedData({
         domain: exchangeDomain(),
         types: { Withdraw: types.Withdraw },
         primaryType: "Withdraw",
-        message: { owner: signer.address, to: signer.address, amount, nonce: BigInt(withdrawNonce), deadline },
+        message: { owner, to: owner, amount, nonce: BigInt(fresh.withdrawNonce), deadline },
       });
-      await post("/withdraw", { owner: signer.address, to: signer.address, amount, deadline, signature });
+      stillConnected();
+      progress({ stage: "submitting" }); submitted = true;
+      result = await post("/withdraw", { owner, to: owner, amount, deadline, signature });
     }
+    if (!PREVIEW && !result?.tx) throw Error("The relayer did not return a withdrawal receipt.");
+    progress({ stage: "complete", tx: result?.tx });
     toast("good", `Withdrew ${usdExact(amount)}`, "It is in your wallet.");
-    await loadAccount();
+    await Promise.allSettled([loadAccount(), loadHistory()]);
     return true;
   } catch (error) {
-    report("Withdrawal failed", error);
+    const message = error instanceof ApiError ? error.message : explainWalletError(error);
+    if (submitted && (!(error instanceof ApiError) || error.status >= 500)) {
+      progress({ stage: "pending", error: "The response was interrupted. Checking your withdrawal before allowing another submission." });
+      return false;
+    }
+    progress({ stage: "error", error: message });
+    if (getState().dialog !== "withdraw" || getState().owner?.toLowerCase() !== slot) report("Withdrawal failed", error);
     return false;
+  } finally {
+    withdrawing.delete(slot);
   }
 }
 

@@ -30,6 +30,7 @@ import { liveClaims } from "./indexer.mjs";
 import { sweepable } from "./keeper.mjs";
 import { ReferralRefused } from "./referrals.mjs";
 import { createReferralCodes } from "./referral-codes.mjs";
+import { readAccountSnapshot } from "./account-balance.mjs";
 import { EXEC_DELAY, PIN_WINDOW, INTENT_TTL, DIRECT_DELAY, WITHDRAW_DELAY, GRACE, REQUEST_EXPIRY } from "../../shared/eip712.mjs";
 import { Rejected, toJson, acct, lower, nowSeconds, isAddr } from "./util.mjs";
 
@@ -216,7 +217,7 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
       ? [erc20(addresses.coin, "balanceOf", [owner]), st("staked", [owner]), st("pendingReward", [owner]), erc20(addresses.coin, "allowance", [owner, addresses.staking])]
       : [];
     const [account, ahead, usdcWallet, usdcNonce, eth, ...coin] = await Promise.all([
-      read("lens", "account", [owner]),
+      readAccountSnapshot(chain, owner),
       read("lens", "queueAhead", [owner, 300n]),
       erc20(addresses.usdc, "balanceOf", [owner]),
       publicClient.readContract({ address: addresses.usdc, abi: NONCES_ABI, functionName: "nonces", args: [owner] }),
@@ -227,6 +228,7 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
     return {
       address: owner,
       name: names.get(lower(owner)) ?? null,
+      blockNumber: account.blockNumber,
       balance: account.balance,
       queued: account.queued,
       queueAhead: ahead[1] ? ahead[0] : null,

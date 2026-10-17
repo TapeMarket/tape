@@ -106,6 +106,15 @@ export interface Position {
   stopLoss?: string | null;
 }
 
+export interface AccountBalance {
+  address: Address;
+  blockNumber: string;
+  balance: string;
+  queued: string;
+  marginInUse: string;
+  reserved?: string;
+}
+
 export interface Trade {
   id: Hex;
   owner: Address;
@@ -123,6 +132,8 @@ export interface Trade {
   fee: string;
   time: number;
   tx: Hex;
+  /** Confirmed collateral at the close's indexed block, sent only on the owner's stream. */
+  accountBalance?: AccountBalance;
 }
 
 export interface Intent {
@@ -165,6 +176,8 @@ export interface ReferralPage {
 
 export interface Account {
   address: Address;
+  /** Block used for the authoritative collateral read; absent on older/practice backends. */
+  blockNumber?: string;
   name: string | null;
   /** Who referred this account, if anybody. Absent on a relayer from before referrals. */
   referrer?: Address | null;

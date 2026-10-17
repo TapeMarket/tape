@@ -23,6 +23,7 @@ export const EMPTY_HISTORY: History = { trades: [], transfers: [], staking: [], 
 export interface State {
   /** In-flight funding survives closing the dialog; each connected wallet has its own result. */
   depositFlows: Record<string, import("./deposit-flow").DepositFlow | undefined>;
+  withdrawFlows: Record<string, import("./withdraw-flow").WithdrawFlow | undefined>;
   config: Config | null;
   /** Why the relayer could not be reached, if it could not. */
   offline: string | null;
@@ -56,6 +57,7 @@ export interface State {
 
 let state: State = {
   depositFlows: {},
+  withdrawFlows: {},
   config: null,
   offline: null,
   clockOffset: 0,

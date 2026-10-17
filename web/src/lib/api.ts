@@ -132,19 +132,30 @@ export async function loadConfig(): Promise<void> {
 }
 
 let accountTimer: ReturnType<typeof setTimeout> | null = null;
+let accountRead = 0;
+let appliedAccountRead = 0;
+let accountBalanceVersion = 0;
 
 export async function loadAccount(): Promise<void> {
   const owner = getState().owner;
   if (!owner) return;
+  const sequence = ++accountRead;
+  const balanceVersion = accountBalanceVersion;
   const account = await get<Account>(`/account/${owner}`);
-  if (getState().owner !== owner) return;
+  if (getState().owner !== owner || sequence < appliedAccountRead) return;
+  const current = getState().account;
+  if (current?.blockNumber && (!account.blockNumber || BigInt(account.blockNumber) < BigInt(current.blockNumber))) return;
+  if (current?.blockNumber && account.blockNumber === current.blockNumber && balanceVersion !== accountBalanceVersion) return;
+  appliedAccountRead = sequence;
   // This snapshot may be older than what the stream has already said: an order only moves forward.
   const intents = { ...getState().intents };
   for (const intent of account.intents) {
     const known = intents[intent.id];
     if (!known || STAGE[intent.status] >= STAGE[known.status]) intents[intent.id] = intent;
   }
-  setState({ account, intents });
+  // An HTTP snapshot can reach us before the indexer catches up, then arrive after its close event.
+  const closed = new Set(getState().history.trades.map(trade => trade.id));
+  setState({ account: { ...account, positions: account.positions.filter(position => !closed.has(position.id)) }, intents });
 }
 
 const STAGE: Record<Intent["status"], number> = { accepted: 0, filled: 1, confirmed: 2, failed: 2 };
@@ -217,8 +228,20 @@ function removePosition(id: string): void {
 }
 
 function onClosed(trade: Trade): void {
-  removePosition(trade.id);
-  setState((s) => ({ history: { ...s.history, trades: [trade, ...s.history.trades.filter((t) => t.id !== trade.id)] } }));
+  if (getState().owner?.toLowerCase() !== trade.owner.toLowerCase()) return;
+  const duplicate = getState().history.trades.some(t => t.id === trade.id && t.tx === trade.tx);
+  setState(s => {
+    let account = s.account;
+    if (account) {
+      const snapshot = trade.accountBalance;
+      const fresh = snapshot && snapshot.address.toLowerCase() === account.address.toLowerCase()
+        && (!account.blockNumber || BigInt(snapshot.blockNumber) >= BigInt(account.blockNumber));
+      if (fresh) accountBalanceVersion++;
+      account = { ...account, ...(fresh ? { balance: snapshot.balance, queued: snapshot.queued, marginInUse: snapshot.marginInUse, blockNumber: snapshot.blockNumber, reserved: snapshot.reserved ?? account.reserved } : {}), positions: account.positions.filter(p => p.id !== trade.id) };
+    }
+    return { account, history: { ...s.history, trades: [trade, ...s.history.trades.filter(t => t.id !== trade.id)] } };
+  });
+  if (duplicate) return;
   const symbol = getState().config?.markets[trade.market]?.symbol ?? "";
   const coinSymbol = getState().config?.coin?.symbol;
   const pnl = BigInt(trade.pnl);
@@ -227,7 +250,7 @@ function onClosed(trade: Trade): void {
     const queued = BigInt(trade.queued);
     toast("good", `${symbol} closed ${usd(pnl, { sign: true })}`, queued > 0n ? `${usd(queued)} is queued: the vault pays it as losses come in.` : undefined);
   } else toast("info", `${symbol} closed ${usd(pnl, { sign: true })}`);
-  refreshAccountSoon();
+  refreshAccountSoon(0);
 }
 
 function handle(type: string, data: unknown): void {

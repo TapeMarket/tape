@@ -99,3 +99,74 @@ test("no-op state patches are quiet while meaningful updates notify immediately"
   f.setState({ marketId: 1 }); assert.equal(count, 1); assert.equal(f.getState().marketId, 1);
   f.setState({ owner: "0x01" }); assert.equal(count, 2); off(); f.setState({ marketId: 2 }); assert.equal(count, 2);
 });
+
+const owner = "0x1000000000000000000000000000000000000001";
+const position = { id: "0x01", owner, status: "open", margin: "20000000" };
+const account = (blockNumber = "10", balance = "5000000") => ({ address: owner, blockNumber, balance, reserved: "10000000", queued: "0", marginInUse: "20000000", positions: [position], intents: [] });
+const close = (blockNumber = "11", balance = "25000000") => ({ id: position.id, owner, market: 0, tx: "0xab", pnl: "100000000", queued: "80000000", credited: "20000000", busted: false, accountBalance: { address: owner, blockNumber, balance, reserved: "0", queued: "80000000", marginInUse: "0" } });
+async function streamFixture(t) {
+  const f = fixture(t), saved = globalThis.EventSource;
+  const handlers = new Map();
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  globalThis.EventSource = class {
+    static CLOSED = 2;
+    addEventListener(type, callback) { handlers.set(type, callback); }
+    close() {}
+  };
+  t.after(() => { globalThis.EventSource = saved; });
+  f.setState({ owner, account: account() });
+  await f.connectStream();
+  return { ...f, emit: (type, data) => handlers.get(type)({ data: JSON.stringify(data) }) };
+}
+
+test("a confirmed close removes the position and publishes actual cash in one state update, excluding queued PnL", async t => {
+  const f = await streamFixture(t), changes = [];
+  f.subscribe(() => { const a = f.getState().account; changes.push([a.balance, a.positions.length]); });
+  f.emit("closed", close());
+  assert.deepEqual(changes[0], ["25000000", 0]);
+  assert.equal(f.getState().account.queued, "80000000");
+  assert.equal(f.getState().account.reserved, "0", "an old open reservation cannot hide cash returned by a confirmed close");
+  assert.equal(f.requests.length, 0, "cash is visible without waiting for an account round trip");
+  assert.equal(f.getState().account.blockNumber, "11");
+});
+
+test("an older in-flight account read cannot undo settled cash or restore a closed position", async t => {
+  const f = await streamFixture(t), pending = f.loadAccount();
+  await flush(); f.emit("closed", close());
+  f.requests[0].reply(account()); await pending;
+  assert.equal(f.getState().account.balance, "25000000");
+  assert.equal(f.getState().account.positions.length, 0);
+  const sameBlock = f.loadAccount(); await flush(); f.requests[1].reply(account("11", "25000000")); await sameBlock;
+  assert.equal(f.getState().account.positions.length, 0, "same-block indexer lag does not resurrect a settled trade");
+});
+
+test("a same-block request begun before a settlement cannot restore an outdated margin reservation", async t => {
+  const f = await streamFixture(t), pending = f.loadAccount();
+  await flush(); f.emit("closed", close());
+  f.requests[0].reply(account("11", "25000000")); await pending;
+  assert.equal(f.getState().account.reserved, "0");
+  assert.equal(f.getState().account.positions.length, 0);
+});
+
+test("duplicate or older settlements cannot overwrite a newer balance, double-credit or repeat the close toast", async t => {
+  const f = await streamFixture(t);
+  f.emit("closed", close());
+  const fresh = f.loadAccount(); await flush(); f.requests[0].reply({ ...account("12", "15000000"), positions: [] }); await fresh;
+  const toasts = f.getState().toasts.length;
+  f.emit("closed", close());
+  assert.equal(f.getState().account.balance, "15000000");
+  assert.equal(f.getState().history.trades.length, 1);
+  assert.equal(f.getState().toasts.length, toasts);
+});
+
+test("account responses cannot arrive out of order or cross a wallet switch", async t => {
+  const f = await streamFixture(t), older = f.loadAccount(), newer = f.loadAccount();
+  await flush(); f.requests[1].reply(account("12", "17000000")); await newer;
+  f.requests[0].reply(account("11", "10000000")); await older;
+  assert.equal(f.getState().account.balance, "17000000");
+  const other = "0x2000000000000000000000000000000000000002";
+  f.setState({ owner: other, account: { ...account(), address: other } });
+  f.emit("closed", close("13"));
+  assert.equal(f.getState().account.balance, "5000000");
+  assert.equal(f.getState().account.positions.length, 1);
+});

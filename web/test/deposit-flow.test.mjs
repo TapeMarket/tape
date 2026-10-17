@@ -10,7 +10,7 @@ const owner = "0x1000000000000000000000000000000000000001";
 const pin = depositPinFrom({ name: "Tape", chainId: 1, deposits: "0x2000000000000000000000000000000000000002" });
 const hash = `0x${"ab".repeat(32)}`;
 const bundled = await build({
-  stdin: { resolveDir: fileURLToPath(new URL("../src/lib/", import.meta.url)), contents: 'export {deposit} from "./actions"; export * from "./deposit-flow"; export {depositAddressOf} from "./deposits"; export {setState,getState} from "./store";', loader: "ts" },
+  stdin: { resolveDir: fileURLToPath(new URL("../src/lib/", import.meta.url)), contents: 'export {deposit,withdraw} from "./actions"; export * from "./deposit-flow"; export * from "./withdraw-flow"; export {depositAddressOf} from "./deposits"; export {setState,getState} from "./store";', loader: "ts" },
   bundle: true, format: "cjs", platform: "node", write: false, external: ["react", "viem", "viem/accounts"],
   alias: { "@shared": fileURLToPath(new URL("../../shared/", import.meta.url)) }, define: { __MAINNET_DEPOSITS__: JSON.stringify(pin) }, logLevel: "silent",
   plugins: [{ name: "funding-fixtures", setup(builder) {
@@ -20,7 +20,7 @@ const bundled = await build({
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ loader: "js", contents: args.path === "api" ? `
       export class ApiError extends Error { constructor(message,status){super(message);this.status=status;} }
       export const get=path=>globalThis.__funding.get(path); export const post=(path,body)=>globalThis.__funding.post(path,body);
-      export const loadAccount=async()=>{globalThis.__funding.accountLoads++;}; export const loadHistory=async()=>{};
+      export const loadAccount=async()=>{globalThis.__funding.accountLoads++;if(globalThis.__funding.failRefresh)throw Error('Refresh unavailable');}; export const loadHistory=async()=>{};
       export const loadCoin=async()=>{};export function refreshAccountSoon(){}
     ` : 'export const getSigner=()=>globalThis.__funding.signer;export const explainWalletError=error=>error.message;' }));
   } }],
@@ -39,7 +39,7 @@ function fixture(t) {
     signer: { address: owner, async write(call, submitted) { writes.push(call); submitted(hash); transfers.unshift(receipt(call.args[1])); return hash; }, async signTypedData(data) { permits.push(data); return `0x${"11".repeat(64)}1b`; } },
     async get(path) {
       if(path.startsWith("/history/")) return { transfers: structuredClone(transfers) };
-      if(path.startsWith("/account/")) return { balance: "9999999999999", wallet: { usdcNonce: "7" } };
+      if(path.startsWith("/account/")) return { balance: "9999999999999", reserved:"0", withdrawNonce:"7", wallet: { usdcNonce: "7" } };
       if(path.startsWith("/deposit-address/")) return { address: m.depositAddressOf(pin.deposits,pin.box,owner), ...pin, pending: "0", minimum: "10000000" };
       throw Error(`Unexpected read ${path}`);
     },
@@ -48,7 +48,7 @@ function fixture(t) {
   globalThis.__funding = f;
   m.setState({ owner, dialog:"deposit", config: { name:"Tape",chainId:1,addresses:{usdc:owner,deposits:pin.deposits,gateway:pin.box},usdcPermit:{name:"USD Coin",version:"2"} } });
   t.after(() => { globalThis.setTimeout=saved.timeout;Date.now=saved.now;delete globalThis.__funding; });
-  return {...f, flow:()=>m.getState().depositFlows[owner.toLowerCase()]};
+  return {...f, flow:()=>m.getState().depositFlows[owner.toLowerCase()], withdrawal:()=>m.getState().withdrawFlows[owner.toLowerCase()]};
 }
 
 test("deposit stages follow wallet, broadcast and indexed credit; repeated clicks send once", async t => {
@@ -64,6 +64,45 @@ test("wallet rejection stays retryable, preserves the exact amount and sends not
   const f=fixture(t);f.signer.write=async()=>{throw Error("You declined the request in your wallet.");};
   assert.equal(await f.deposit(25_123456n),false);assert.equal(f.flow().stage,"error");
   assert.equal(f.flow().amount,"25123456");assert.match(f.flow().error,/declined/);assert.equal(f.posts.length,0);
+});
+
+test("withdrawals sign the exact amount, fresh nonce and connected destination once, surviving dialog close", async t => {
+  const f=fixture(t);let approve;
+  f.signer.signTypedData=async data=>{f.permits.push(data);await new Promise(resolve=>{approve=resolve;});return '0x11';};
+  const pending=f.withdraw(25_123456n);await flush();assert.equal(f.withdrawal().stage,'wallet');
+  assert.equal(await f.withdraw(25_123456n),false);f.setState({dialog:null});
+  approve();assert.equal(await pending,true);assert.equal(f.withdrawal().stage,'complete');
+  assert.equal(f.permits.length,1);assert.deepEqual(f.permits[0].message,{owner,to:owner,amount:25_123456n,nonce:7n,deadline:700n});
+  assert.equal(f.posts.length,1);assert.equal(f.posts[0].path,'/withdraw');
+});
+
+test("a declined withdrawal preserves its amount and can retry with a new flow", async t => {
+  const f=fixture(t);f.signer.signTypedData=async()=>{throw Error('You declined the request in your wallet.');};
+  assert.equal(await f.withdraw(10_123456n),false);assert.equal(f.withdrawal().stage,'error');assert.equal(f.withdrawal().amount,'10123456');assert.equal(f.posts.length,0);
+  f.signer.signTypedData=async()=> '0x11';assert.equal(await f.withdraw(10_123456n),true);assert.equal(f.withdrawal().stage,'complete');
+});
+
+test("withdrawal fresh balance and wallet changes are checked before any money request is sent", async t => {
+  const f=fixture(t), accountGet=globalThis.__funding.get;
+  globalThis.__funding.get=async path=>path.startsWith('/account/')?{balance:'25000000',reserved:'20000000',withdrawNonce:'1'}:accountGet(path);
+  assert.equal(await f.withdraw(10_000000n),false);assert.equal(f.permits.length,0);assert.equal(f.posts.length,0);
+  globalThis.__funding.get=accountGet;
+  f.signer.signTypedData=async()=>{f.setState({owner:'0x2000000000000000000000000000000000000002'});return '0x11';};
+  assert.equal(await f.withdraw(10_000000n),false);assert.equal(f.posts.length,0);
+});
+
+test("an interrupted withdrawal stays pending and cannot be blindly signed again", async t => {
+  const f=fixture(t);globalThis.__funding.post=async()=>{throw Error('Response lost');};
+  assert.equal(await f.withdraw(25_000000n),false);assert.equal(f.withdrawal().stage,'pending');
+  assert.equal(await f.withdraw(25_000000n),false);assert.equal(f.permits.length,1);
+});
+
+test("withdrawal completion survives a failed account refresh and only new matching receipts resolve uncertainty", async t => {
+  const f=fixture(t);globalThis.__funding.failRefresh=true;
+  assert.equal(await f.withdraw(25_000000n),true);assert.equal(f.withdrawal().stage,'complete');
+  const receipt={type:'withdraw',to:owner,amount:'25000000',time:100,tx:hash}, flow={...f.withdrawal(),baseline:[receipt]};
+  assert.equal(f.withdrawalSince(flow,[receipt,{...receipt,type:'deposit'},{...receipt,amount:'1'},{...receipt,to:pin.box}]),undefined);
+  assert.deepEqual(f.withdrawalSince(flow,[receipt,{...receipt,tx:'0x'+'cd'.repeat(32)}]),{...receipt,tx:'0x'+'cd'.repeat(32)});
 });
 
 test("profits and other balance changes cannot finish a deposit that has no indexed receipt", async t => {

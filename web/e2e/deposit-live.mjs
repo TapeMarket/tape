@@ -36,6 +36,7 @@ try {
       static CONNECTING=0;static OPEN=1;static CLOSED=2;readyState=1;listeners=new Map();
       constructor(url){
         if(new URL(url).searchParams.get('owner')?.toLowerCase()!==owner.toLowerCase())return new NativeEventSource(url);
+        window.__ownerStream=this;
         setTimeout(()=>{this.onopen?.({});this.listeners.get('hello')?.({data:JSON.stringify({time:Date.now()})});},0);
       }
       addEventListener(type,callback){this.listeners.set(type,callback);}
@@ -54,7 +55,7 @@ try {
   await context.route(`${api}/**`,async route=>{
     const request=route.request(),url=new URL(request.url()),path=url.pathname;
     if(request.method()!=='GET'){writes.push(path);return route.abort();}
-    if(path===`/account/${owner}`)return route.fulfill({json:{address:owner,name:null,balance:transfers.length?'125000000':'100000000',queued:'0',reserved:'0',marginInUse:'0',positions:[],intents:[],claims:[],coin:null,withdrawRequest:null,wallet:{usdc:'500456789',eth:'100000000000000',usdcNonce:'0'},stats:{},badges:[]}});
+    if(path===`/account/${owner}`)return route.fulfill({json:{address:owner,blockNumber:'100',name:null,balance:transfers.length?'125000000':'100000000',queued:'0',reserved:'0',marginInUse:'0',positions:[],intents:[],claims:[],coin:null,withdrawRequest:null,wallet:{usdc:'500456789',eth:'100000000000000',usdcNonce:'0'},stats:{},badges:[]}});
     if(path===`/history/${owner}`){await historyReady;return route.fulfill({json:history()});}
     if(path===`/deposit-address/${owner}`)return route.fulfill({json:{...pin,address:wrong?owner:expected,pending:'0',minimum:'10000000'}});
     if(path==='/stream'&&url.searchParams.get('owner')?.toLowerCase()===owner.toLowerCase())return route.fulfill({contentType:'text/event-stream',body:`event: hello\ndata: {"time":${Date.now()}}\n\n`});
@@ -106,6 +107,14 @@ try {
   wrong=true;await page.locator('.wallet-add').click();await dialog.getByRole('tab',{name:'Transfer USDC'}).click();
   await dialog.getByRole('alert').waitFor();assert.equal(await dialog.getByLabel('Your deposit address').count(),0);assert.equal(await dialog.getByRole('img',{name:'Deposit address QR code'}).count(),0);
   await dialog.getByRole('tab',{name:'Connected wallet'}).click();await dialog.getByLabel('Amount in USDC').fill('25');assert.ok(await dialog.getByRole('button',{name:'Deposit',exact:true}).isDisabled());
+  await dialog.getByRole('button',{name:'Close',exact:true}).click();
+  const settled=await page.evaluate(async owner=>{
+    window.__ownerStream.listeners.get('closed')({data:JSON.stringify({id:'0x'+'12'.repeat(32),owner,market:0,tx:'0x'+'34'.repeat(32),pnl:'100000000',queued:'80000000',credited:'22000000',busted:false,accountBalance:{address:owner,blockNumber:'101',balance:'147000000',queued:'80000000',marginInUse:'0'}})});
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    return document.querySelector('.wallet-text b').textContent;
+  },owner);
+  assert.equal(settled,'$147.00');
+  console.log('PASS: a confirmed settlement updates the rendered balance in the same frames, using credited cash and keeping queued winnings separate.');
   assert.deepEqual(await page.evaluate(()=>window.__walletWrites),[]);assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
   console.log('PASS: published code refuses a substituted address; zero signing requests, transaction requests, API writes or browser exceptions.');
   await context.close();
