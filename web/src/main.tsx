@@ -1,3 +1,4 @@
+import { tx, restoreLocale, useLocale } from "./lib/i18n";
 import { Component, lazy, StrictMode, Suspense, useEffect, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/app.css";
@@ -10,12 +11,14 @@ import { loadExchange, PATHS, preloadRoute } from "./lib/route-preload";
 
 // The link somebody came through, before anything else can change the address.
 captureReferral();
+restoreLocale();
 
 const ExchangeApp = lazy(loadExchange);
 // A direct link loads the shell and its requested screen in parallel, as hovering a link does.
 preloadRoute(location.pathname);
 
 function App() {
+  useLocale();
   const path = useStore((s) => s.path);
   // Public setup is small. Wallets, trading charts and price subscriptions load with the exchange.
   useEffect(() => {
@@ -45,7 +48,7 @@ function App() {
   // The front page is its own screen: none of the exchange's bars around it. It does not wait for
   // the exchange's configuration either, so it is there at once.
   if (path === "/") return <><Landing /><Support /></>;
-  return <><Suspense fallback={<div className="empty" role="status">Opening exchange…</div>}><ExchangeApp /></Suspense><Support /></>;
+  return <><Suspense fallback={<div className="empty" role="status">{tx("Opening exchange…")}</div>}><ExchangeApp /></Suspense><Support /></>;
 }
 
 /**
@@ -66,10 +69,8 @@ class Recover extends Component<{ children: ReactNode }, { failed: boolean }> {
     if (!this.state.failed) return this.props.children;
     return (
       <div className="empty" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-        <span>The page stopped working in this tab.</span>
-        <button className="btn primary" onClick={() => location.reload()}>
-          Reload
-        </button>
+        <span>{tx("The page stopped working in this tab.")}</span>
+        <button className="btn primary" onClick={() => location.reload()}>{tx("Reload")}</button>
       </div>
     );
   }

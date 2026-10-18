@@ -3094,6 +3094,29 @@ p {
   }
 }
 
+.language-picker { position: relative; flex: none; z-index: 160; }
+.language-button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 8px; border: 1px solid currentColor; border-radius: 5px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.language-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 196px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); box-shadow: 0 10px 28px -10px #0a163850; }
+.language-menu button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 12px; border: 0; border-radius: 3px; background: transparent; color: inherit; text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
+.language-menu button:hover, .language-menu button[aria-checked="true"] { background: var(--blue-soft); color: var(--blue); }
+.language-menu p { margin: 8px; font-size: 12px; line-height: 1.5; color: var(--down); }
+.lp-nav > .language-picker { margin-left: auto; color: var(--blue); }
+.lp-nav > .language-picker + .lp-launch { margin-left: 0; }
+@media(max-width:600px) {
+  .top { gap: 7px; }
+  .top-brand svg { width: 76px; }
+  .top > .language-picker { margin-left: auto; }
+  .top > .language-picker + .wallet, .top > .language-picker + .wallet-connect { margin-left: 0; }
+  .language-button { gap: 4px; padding: 0 5px; min-height: 34px; }
+  .lp-nav { gap: 10px; padding-inline: 16px; }
+  .lp-nav .lp-logo svg { width: 80px; }
+  .lp-launch { padding-inline: 14px; }
+}
+html:lang(ru) body { font-family: "Archivo Variable", "Helvetica Neue", Arial, sans-serif; }
+html:lang(zh-CN) body { font-family: "Archivo Variable", "PingFang SC", "Microsoft YaHei", sans-serif; }
+html:lang(ko) body { font-family: "Archivo Variable", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+html:lang(ja) body { font-family: "Archivo Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+
 /* The front page ("/"). White paper, big type, two bands of tape that unroll across the hero and
    never stop running: the blue one carries the prices, the white one every trade as it prints. */
 .lp {
@@ -6608,4 +6631,28 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
   .status-page .hero h1 { font-size: 30px; }
   .tt .chart-pill button, .tt .chart-pill select { min-height: 40px; }
   .slip-chips .chip { min-height: 40px; }
+}
+
+/* Leave room for the language control and longer translated account captions. */
+@media (max-width: 1440px) {
+  .quote:nth-child(n + 2) { display: none; }
+}
+@media (max-width: 600px) {
+  .top { gap: 6px; padding-inline: 8px; }
+  .top-brand svg { width: 64px; }
+  .top > .language-picker { margin-left: auto; }
+  .top > .language-picker + .wallet, .top > .language-picker + .wallet-connect { margin-left: 0; }
+  .wallet { min-width: 0; flex: 0 1 auto; }
+  .wallet-main { min-width: 0; gap: 6px; padding: 0 6px 0 12px; }
+  .wallet-main .wallet-dot { display: none; }
+  .wallet-main .caret { margin-left: 0; }
+  .wallet-text { min-width: 0; }
+  .wallet-text small { max-width: 98px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .wallet-add, .wallet-withdraw { padding-inline: 9px; }
+  .wallet-connect { max-width: calc(100vw - 146px); padding-inline: 15px; font-size: 12px; line-height: 1.2; white-space: normal; }
+  .top .language-menu { position: fixed; top: 58px; left: 8px; right: auto; max-height: calc(100dvh - 76px); overflow-y: auto; }
+  .lp-nav { gap: 8px; padding-inline: 12px; }
+  .lp-nav .lp-logo svg { width: 70px; }
+  .lp-nav .lp-launch { padding-inline: 12px; font-size: 12px; }
+  .lp-nav .language-menu { position: fixed; top: 80px; left: auto; right: 12px; }
 }

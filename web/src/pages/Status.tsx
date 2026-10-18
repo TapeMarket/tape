@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import { useRef, useState, type CSSProperties } from "react";
 import { Hero } from "../components/Hero";
 import { Panel } from "../components/Panels";
@@ -155,12 +156,12 @@ export function StatusPage() {
   return (
     <div className="sheet work-page status-page">
       <Hero
-        title={<span aria-live="polite">{headline}</span>}
-        lede={probe.at === null ? (failed ? "No answer yet." : "Checking.") : `Checked ${ago(probe.at, now)} ago, every few seconds while this page is open.`}
+        title={<span aria-live="polite">{tx(headline)}</span>}
+        lede={probe.at === null ? (failed ? tx("No answer yet.") : tx("Checking.")) : tx("Checked {0} ago, every few seconds while this page is open.", [ago(probe.at, now)])}
         actions={
           <span className={`verdict ${tone}`}>
             <i />
-            {badge[0]}
+            {tx(badge[0])}
           </span>
         }
         figures={[
@@ -176,16 +177,16 @@ export function StatusPage() {
         ]}
       />
 
-      <PageSection title="Services" detail="Current availability of the exchange, prices and settlement data.">
+      <PageSection title={tx("Services")} detail={tx("Current availability of the exchange, prices and settlement data.")}>
         <div className="lamps">
           {services.map(
             (service) =>
               service && (
                 <div className={`lamp ${service[1][1] ?? "unknown"}`} key={service[0]}>
-                  <span>{service[0]}</span>
+                  <span>{tx(service[0])}</span>
                   <span>
                     {service[1][1] !== null && <i className={`dot ${service[1][1]}`} />}
-                    {service[1][0]}
+                    {tx(service[1][0])}
                   </span>
                 </div>
               ),
@@ -193,23 +194,18 @@ export function StatusPage() {
         </div>
       </PageSection>
 
-      <PageSection title="Settlement" detail="The Ethereum blocks trades settle in, and the next winnings waiting to be paid.">
+      <PageSection title={tx("Settlement")} detail={tx("The Ethereum blocks trades settle in, and the next winnings waiting to be paid.")}>
       <div className="cells status-grid">
         <Panel
-          title="Ethereum blocks"
+          title={tx("Ethereum blocks")}
           tools={
             <span className="seg">
-              <span className={`live ${live && !preview ? "" : "off"}`}>{preview ? "Preview" : live ? "Live" : "Waiting"}</span>
+              <span className={`live ${live && !preview ? "" : "off"}`}>{preview ? tx("Preview") : live ? tx("Live") : tx("Waiting")}</span>
             </span>
           }
         >
           <div className="panel-body">
-            {preview ? (
-              <p className="note">There are no blocks in preview. Once the contracts are live this shows the chain they settle on.</p>
-            ) : blocks.length === 0 ? (
-              <p className="note">{status ? "The node sent no recent blocks." : "Checking."}</p>
-            ) : (
-              <>
+            {preview ? (<p className="note">{tx("There are no blocks in preview. Once the contracts are live this shows the chain they settle on.")}</p>) : blocks.length === 0 ? (<p className="note">{status ? tx("The node sent no recent blocks.") : tx("Checking.")}</p>) : (<>
                 {/* Oldest on the left. When they do not all fit, the old ones are the ones cut off. */}
                 <div className="blocks" style={{ justifyContent: "flex-end" }}>
                   {blocks.map((block) => {
@@ -217,25 +213,23 @@ export function StatusPage() {
                     return (
                       <div className={`block ${block === head ? "head" : ""}`} key={block.number}>
                         <header>
-                          <span>{block === head ? "Latest" : "Mined"}</span>
+                          <span>{block === head ? tx("Latest") : tx("Mined")}</span>
                           <b>{percent(used, 1)}</b>
                         </header>
                         <div className="gauge" aria-hidden="true" style={{ "--used": percent(Math.min(used, 1), 1) } as CSSProperties} />
                         <footer>
-                          #{block.number} / {(Number(big(block.gasUsed)) / 1e6).toFixed(2)}M gas / {gwei(block.baseFee)} gwei
-                        </footer>
+                          #{block.number} / {(Number(big(block.gasUsed)) / 1e6).toFixed(2)}{tx("M gas / ")}{gwei(block.baseFee)} {tx(" gwei ")}</footer>
                       </div>
                     );
                   })}
                 </div>
-                <p className="note">How full recent blocks were. Trades settle inside these.</p>
-              </>
-            )}
+                <p className="note">{tx("How full recent blocks were. Trades settle inside these.")}</p>
+              </>)}
           </div>
         </Panel>
 
-        <Panel title="Next queued payouts" tools={<span className="dim">Top 10</span>}>
-          <Table head={["#", "User", ["Amount", "r"], ["Waiting", "r"]]} empty={failed ? "Payout data is unavailable while the relayer is unreachable." : status ? "The queue is empty. Every winner has been paid." : "Checking."}>
+        <Panel title={tx("Next queued payouts")} tools={<span className="dim">{tx("Top 10")}</span>}>
+          <Table head={["#", "User", ["Amount", "r"], ["Waiting", "r"]]} empty={failed ? tx("Payout data is unavailable while the relayer is unreachable.") : status ? tx("The queue is empty. Every winner has been paid.") : tx("Checking.")}>
             {(status?.queue ?? []).map((entry, i) => (
               <tr key={entry.id}>
                 <td className="soft">{i + 1}</td>

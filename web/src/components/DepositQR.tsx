@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import { useMemo } from "react";
 import qrcode from "qrcode-generator";
 
@@ -12,7 +13,7 @@ export default function DepositQR({ address }: { address: string }) {
     for (let row = 0; row < count; row++) for (let col = 0; col < count; col++) if (qr.isDark(row, col)) cells.push(`M${col + 4},${row + 4}h1v1h-1z`);
     return { size: count + 8, path: cells.join("") };
   }, [address]);
-  return <svg className="deposit-qr" viewBox={`0 0 ${code.size} ${code.size}`} role="img" aria-label="Deposit address QR code" shapeRendering="crispEdges">
+  return <svg className="deposit-qr" viewBox={`0 0 ${code.size} ${code.size}`} role="img" aria-label={tx("Deposit address QR code")} shapeRendering="crispEdges">
     <rect width={code.size} height={code.size} fill="white" /><path d={code.path} fill="#0a1638" />
   </svg>;
 }

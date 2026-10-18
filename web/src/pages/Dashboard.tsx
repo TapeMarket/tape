@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { Hero } from "../components/Hero";
 import { useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import {
@@ -166,50 +167,35 @@ export function Dashboard() {
   return (
     <div className="sheet work-page dashboard-page">
       <Hero
-        title="Dashboard"
-        lede="Build your view of the exchange. Drag panels or use their arrow buttons to arrange them. Your layout stays in this browser."
+        title={tx("Dashboard")}
+        lede={tx("Build your view of the exchange. Drag panels or use their arrow buttons to arrange them. Your layout stays in this browser.")}
       />
       <ExchangeDataNotice data={data} />
       <div className="dash-bar page-toolbar">
-        <span className="seg" role="group" aria-label="Layout">
-          <button aria-pressed={board.view === "overview"} onClick={() => show({ ...board, view: "overview" })}>
-            Overview
-          </button>
-          <button aria-pressed={board.view === "custom"} onClick={() => show({ ...board, view: "custom" })}>
-            Custom
-          </button>
+        <span className="seg" role="group" aria-label={tx("Layout")}>
+          <button aria-pressed={board.view === "overview"} onClick={() => show({ ...board, view: "overview" })}>{tx("Overview")}</button>
+          <button aria-pressed={board.view === "custom"} onClick={() => show({ ...board, view: "custom" })}>{tx("Custom")}</button>
         </span>
-        <span className="dash-count" role="status">{ids.length} panels · {saved ? "Saved in this browser" : "Storage unavailable; changes last for this visit"}</span>
-        <button className="btn small" disabled={isTidy} onClick={() => change(tidied)}>
-          Tidy
-        </button>
-        <Popover className="btn small" align="right" label="Add">
+        <span className="dash-count" role="status"><Localized message={"{0} panels · {1}"} values={[ids.length, saved ? tx("Saved in this browser") : tx("Storage unavailable; changes last for this visit")]} /></span>
+        <button className="btn small" disabled={isTidy} onClick={() => change(tidied)}>{tx("Tidy")}</button>
+        <Popover className="btn small" align="right" label={tx("Add")}>
           <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
             {missing.map((widget) => (
               <button key={widget.id} role="menuitem" onClick={() => change([...ids, widget.id])}>
-                {widget.title}
+                {tx(widget.title)}
               </button>
             ))}
-            {missing.length === 0 && (
-              <span className="dim" style={{ display: "block", padding: "8px 10px", whiteSpace: "nowrap" }}>
-                Everything is on the board
-              </span>
-            )}
+            {missing.length === 0 && (<span className="dim" style={{ display: "block", padding: "8px 10px", whiteSpace: "nowrap" }}>{tx("Everything is on the board")}</span>)}
           </div>
         </Popover>
-        <button className="btn small" disabled={ids.length === 0} onClick={() => change([])}>
-          Clear
-        </button>
+        <button className="btn small" disabled={ids.length === 0} onClick={() => change([])}>{tx("Clear")}</button>
       </div>
 
-      {ids.length === 0 ? (
-        <div className="quiet-empty">
-          <p>Nothing on the board. Add a panel to start.</p>
-          <span>Choose a panel with Add, or return to the exchange overview.</span>
-          <button className="btn primary" onClick={() => show({ ...board, view: "overview" })}>Restore overview</button>
-        </div>
-      ) : (
-        <div className="cells dash">
+      {ids.length === 0 ? (<div className="quiet-empty">
+          <p>{tx("Nothing on the board. Add a panel to start.")}</p>
+          <span>{tx("Choose a panel with Add, or return to the exchange overview.")}</span>
+          <button className="btn primary" onClick={() => show({ ...board, view: "overview" })}>{tx("Restore overview")}</button>
+        </div>) : (<div className="cells dash">
           {ids.map((id, index) => {
             const widget = BY_ID.get(id);
             if (!widget) return null;
@@ -220,10 +206,10 @@ export function Dashboard() {
                 value={{
                   before: <span className="grip" aria-hidden style={{ flex: "none" }} />,
                   after: (
-                    <span className="widget-controls" role="group" aria-label={`Arrange ${widget.title}`}>
-                      <button className="widget-move" aria-label={`Move ${widget.title} earlier`} disabled={index === 0} onClick={() => change(move(ids, id, ids[index - 1]))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 12 5-5 5 5" /></svg></button>
-                      <button className="widget-move" aria-label={`Move ${widget.title} later`} disabled={index === ids.length - 1} onClick={() => change(move(ids, id, ids[index + 1]))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5" /></svg></button>
-                      <button className="close-x" aria-label={`Remove ${widget.title}`} onClick={() => change(ids.filter((other) => other !== id))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8" /></svg></button>
+                    <span className="widget-controls" role="group" aria-label={tx("Arrange {0}", [widget.title])}>
+                      <button className="widget-move" aria-label={tx("Move {0} earlier", [widget.title])} disabled={index === 0} onClick={() => change(move(ids, id, ids[index - 1]))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 12 5-5 5 5" /></svg></button>
+                      <button className="widget-move" aria-label={tx("Move {0} later", [widget.title])} disabled={index === ids.length - 1} onClick={() => change(move(ids, id, ids[index + 1]))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5" /></svg></button>
+                      <button className="close-x" aria-label={tx("Remove {0}", [widget.title])} onClick={() => change(ids.filter((other) => other !== id))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8" /></svg></button>
                     </span>
                   ),
                   className: `widget${drag?.id === id ? " dragging" : ""}${drag?.over === id ? " over" : ""}`,
@@ -235,8 +221,7 @@ export function Dashboard() {
               </Chrome.Provider>
             );
           })}
-        </div>
-      )}
+        </div>)}
     </div>
   );
 }

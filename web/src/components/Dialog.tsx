@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import { useEffect, useRef, type ReactNode } from "react";
 import { setState } from "../lib/store";
 
@@ -50,10 +51,10 @@ export function Dialog({ title, wide, className = "", onClose, children }: { tit
   }, []);
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={`dialog ${wide ? "wide" : ""} ${className}`} role="dialog" aria-modal="true" aria-label={title} ref={box}>
+      <div className={`dialog ${wide ? "wide" : ""} ${className}`} role="dialog" aria-modal="true" aria-label={tx(title)} ref={box}>
         <div className="dialog-head">
-          <h2>{title}</h2>
-          <button className="close-x" aria-label="Close" onClick={close}>
+          <h2>{tx(title)}</h2>
+          <button className="close-x" aria-label={tx("Close")} onClick={close}>
             ×
           </button>
         </div>

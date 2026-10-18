@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { MAX_IMPACT_NOTIONAL, REFERENCE_NOTIONAL, bustPrice, impactNotionalFor, keepShare, quoteClose, sizeLevel } from "@shared/math.mjs";
 import { openPosition, startSession, triggersOnFill } from "../lib/actions";
@@ -37,30 +38,28 @@ function Equity() {
   }
   const known = Boolean(account && markets);
   return (
-    <div className="slip-account" aria-label="Account">
+    <div className="slip-account" aria-label={tx("Account")}>
       <div className="slip-equity">
-        <small>Equity</small>
+        <small>{tx("Equity")}</small>
         <b>{known ? usd(available + margin + openPnl + big(account!.queued)) : dash}</b>
       </div>
       <div className="slip-account-grid">
         <span>
-          <small>Available</small>
+          <small>{tx("Available")}</small>
           {known ? usdDown(available) : dash}
         </span>
         <span>
-          <small>In use</small>
+          <small>{tx("In use")}</small>
           {known ? usd(margin) : dash}
         </span>
         <span>
-          <small>Open PnL</small>
+          <small>{tx("Open PnL")}</small>
           {known ? <span className={openPnl > 0n ? "up" : openPnl < 0n ? "down" : ""}>{usd(openPnl, { sign: true })}</span> : dash}
         </span>
-        {known && big(account!.queued) > 0n && (
-          <span title="Winnings the vault owes you. Paid in order as losses come in.">
-            <small>Queued</small>
+        {known && big(account!.queued) > 0n && (<span title={tx("Winnings the vault owes you. Paid in order as losses come in.")}>
+            <small>{tx("Queued")}</small>
             <span className="warn">{usd(account!.queued)}</span>
-          </span>
-        )}
+          </span>)}
       </div>
     </div>
   );
@@ -83,7 +82,7 @@ function Measure({ mark, bust, isLong, symbol }: { mark: bigint | null; bust: bi
   if (!mark || !bust) {
     return (
       <div className="measure">
-        <div className="measure-say dim">Waiting for a price.</div>
+        <div className="measure-say dim">{tx("Waiting for a price.")}</div>
       </div>
     );
   }
@@ -94,14 +93,12 @@ function Measure({ mark, bust, isLong, symbol }: { mark: bigint | null; bust: bi
   const tight = fraction < 0.002;
   return (
     <div className={`measure ${tight ? "tight" : ""}`}>
-      <div className="measure-say">
-        {symbol} can move <b>{percent(fraction, fraction < 0.01 ? 3 : 2)}</b> (${gap >= 100 ? gap.toFixed(0) : gap.toFixed(2)}) {isLong ? "down" : "up"} before this is liquidated.
-      </div>
+      <div className="measure-say"><Localized message={"{0} can move <0>{1}</0> (${2}) {3} before this is liquidated."} values={[symbol, percent(fraction, fraction < 0.01 ? 3 : 2), gap >= 100 ? gap.toFixed(0) : gap.toFixed(2), isLong ? tx("down") : tx("up")]} components={[<b />]} /></div>
       <div className="measure-tape" aria-hidden="true">
         <i style={{ width: `${(reach * 100).toFixed(2)}%` }} />
         {MEASURE_TICKS.map(([at, label]) => (
           <span key={label} style={{ left: `${(onMeasure(at) * 100).toFixed(2)}%` }}>
-            {label}
+            {tx(label)}
           </span>
         ))}
       </div>
@@ -189,10 +186,10 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
   const triggerCheck = withTriggers ? checkTriggers(tpText, slText, triggerShape, tick?.p ?? null) : { takeProfit: null, stopLoss: null, error: null };
 
   let action: { label: string; disabled?: boolean; tone?: "primary" | "side"; run?: () => void };
-  if (!owner) action = { label: PREVIEW ? "Start trading" : "Connect wallet", tone: "primary", run: () => setState({ dialog: "connect" }) };
+  if (!owner) action = { label: PREVIEW ? tx("Start trading") : tx("Connect wallet"), tone: "primary", run: () => setState({ dialog: "connect" }) };
   else if (!session) {
     action = {
-      label: busy ? "Check your wallet" : "Turn on one-click trading",
+      label: busy ? tx("Check your wallet") : tx("Turn on one-click trading"),
       tone: "primary",
       disabled: busy,
       run: async () => {
@@ -201,22 +198,22 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
         setBusy(false);
       },
     };
-  } else if (activatesIn > 0) action = { label: `Trading on in ${activatesIn}s`, disabled: true };
-  else if (checkingOrder) action = { label: "Checking previous order", disabled: true };
-  else if (offline) action = { label: "Offline: prices are not live", disabled: true };
-  else if (!tick || now - tick.t > 6 || tick.t > now + 2) action = { label: "Waiting for live prices", disabled: true };
-  else if (market.retired) action = { label: "Market retired", disabled: true };
-  else if (config.opensPaused) action = { label: "New positions are paused", disabled: true };
-  else if (!leverageValid) action = { label: `Leverage is a whole number, 1 to ${market.maxLeverage}`, disabled: true };
-  else if (!margin || margin === 0n) action = { label: "Enter a margin", disabled: true };
-  else if (margin < minMargin) action = { label: `Minimum ${usd(minMargin)}`, disabled: true };
-  else if (size < minNotional) action = { label: `Minimum size is ${usdCompact(minNotional)}`, disabled: true };
-  else if (size > big(market.maxNotional)) action = { label: `Size limit is ${usdCompact(market.maxNotional)}`, disabled: true };
-  else if (margin > spendable) action = { label: "Deposit to trade", tone: "primary", run: () => setState({ dialog: "deposit" }) };
-  else if (withTriggers && triggerCheck.error) action = { label: "Check the take-profit and stop-loss", disabled: true };
+  } else if (activatesIn > 0) action = { label: tx("Trading on in {0}s", [activatesIn]), disabled: true };
+  else if (checkingOrder) action = { label: tx("Checking previous order"), disabled: true };
+  else if (offline) action = { label: tx("Offline: prices are not live"), disabled: true };
+  else if (!tick || now - tick.t > 6 || tick.t > now + 2) action = { label: tx("Waiting for live prices"), disabled: true };
+  else if (market.retired) action = { label: tx("Market retired"), disabled: true };
+  else if (config.opensPaused) action = { label: tx("New positions are paused"), disabled: true };
+  else if (!leverageValid) action = { label: tx("Leverage is a whole number, 1 to {0}", [market.maxLeverage]), disabled: true };
+  else if (!margin || margin === 0n) action = { label: tx("Enter a margin"), disabled: true };
+  else if (margin < minMargin) action = { label: tx("Minimum {0}", [usd(minMargin)]), disabled: true };
+  else if (size < minNotional) action = { label: tx("Minimum size is {0}", [usdCompact(minNotional)]), disabled: true };
+  else if (size > big(market.maxNotional)) action = { label: tx("Size limit is {0}", [usdCompact(market.maxNotional)]), disabled: true };
+  else if (margin > spendable) action = { label: tx("Deposit to trade"), tone: "primary", run: () => setState({ dialog: "deposit" }) };
+  else if (withTriggers && triggerCheck.error) action = { label: tx("Check the take-profit and stop-loss"), disabled: true };
   else {
     action = {
-      label: busy ? "Sending" : `${isLong ? "Long" : "Short"} ${market.symbol}`,
+      label: busy ? tx("Sending") : `${isLong ? "Long" : "Short"} ${market.symbol}`,
       tone: "side",
       disabled: busy,
       run: async () => {
@@ -255,24 +252,24 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
   const marks = [1, 10, 50, 200, 1000].filter((v) => v <= market.maxLeverage);
 
   return (
-    <aside className="slip" aria-label="Order ticket">
+    <aside className="slip" aria-label={tx("Order ticket")}>
       <div className="slip-body">
-        <header className="slip-head"><h2>Place a trade</h2><span>{market.symbol} / USDC</span></header>
-        <div className="slip-sides" role="group" aria-label="Direction">
-          <button className="slip-side long" aria-label={`Select Long: ${market.symbol} goes up`} aria-pressed={isLong} onClick={() => setTicket({ isLong: true })}>
-            <b><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13 6-6 6 6M10 7v10" /></svg>Long</b>
-            <small>{market.symbol} goes up</small>
+        <header className="slip-head"><h2>{tx("Place a trade")}</h2><span><Localized message={"{0} / USDC"} values={[market.symbol]} /></span></header>
+        <div className="slip-sides" role="group" aria-label={tx("Direction")}>
+          <button className="slip-side long" aria-label={tx("Select Long: {0} goes up", [market.symbol])} aria-pressed={isLong} onClick={() => setTicket({ isLong: true })}>
+            <b><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13 6-6 6 6M10 7v10" /></svg>{tx("Long")}</b>
+            <small><Localized message={"{0} goes up"} values={[market.symbol]} /></small>
           </button>
-          <button className="slip-side short" aria-label={`Select Short: ${market.symbol} goes down`} aria-pressed={!isLong} onClick={() => setTicket({ isLong: false })}>
-            <b><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 7 6 6 6-6M10 3v10" /></svg>Short</b>
-            <small>{market.symbol} goes down</small>
+          <button className="slip-side short" aria-label={tx("Select Short: {0} goes down", [market.symbol])} aria-pressed={!isLong} onClick={() => setTicket({ isLong: false })}>
+            <b><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 7 6 6 6-6M10 3v10" /></svg>{tx("Short")}</b>
+            <small><Localized message={"{0} goes down"} values={[market.symbol]} /></small>
           </button>
         </div>
 
         <div className="slip-field">
           <div className="slip-label">
-            <label htmlFor="margin">Margin</label>
-            <span>{owner && account ? `${usdDown(spendable)} available` : ""}</span>
+            <label htmlFor="margin">{tx("Margin")}</label>
+            <span>{owner && account ? tx("{0} available", [usdDown(spendable)]) : ""}</span>
           </div>
           <div className="slip-amount">
             <span aria-hidden="true">$</span>
@@ -283,7 +280,7 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
               value={marginText}
               onChange={(e) => setMarginText(amountTyped(marginText, e.target.value, e.nativeEvent as InputEvent))}
             />
-            <small>USDC</small>
+            <small>{tx("USDC")}</small>
           </div>
           <div className="slip-chips">
             {presets.map((v) => (
@@ -291,10 +288,10 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
                 ${v}
               </button>
             ))}
-            <button className="chip" onClick={() => scaleMargin(1n, 2n)} title="Halve the margin">
+            <button className="chip" onClick={() => scaleMargin(1n, 2n)} title={tx("Halve the margin")}>
               ½
             </button>
-            <button className="chip" onClick={nextShare} disabled={!owner} title="A share of what you can spend: 10, 25, 50, then 100 percent">
+            <button className="chip" onClick={nextShare} disabled={!owner} title={tx("A share of what you can spend: 10, 25, 50, then 100 percent")}>
               %
             </button>
           </div>
@@ -302,7 +299,7 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
 
         <div className="slip-field">
           <div className="slip-label">
-            <label htmlFor="leverage">Leverage</label>
+            <label htmlFor="leverage">{tx("Leverage")}</label>
             <span className="slip-lev">
               <input
                 id="leverage"
@@ -330,7 +327,7 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
           <input
             type="range"
             className="ruler"
-            aria-label="Leverage"
+            aria-label={tx("Leverage")}
             min={0}
             max={STOPS}
             value={stop}
@@ -361,65 +358,45 @@ export function Ticket({ market, onOrder }: { market: Market; onOrder?: () => vo
 
         <dl className="slip-receipt">
           <div>
-            <dt>Position size</dt>
+            <dt>{tx("Position size")}</dt>
             <dd>{usdCompact(size)}</dd>
           </div>
           <div>
-            <dt>Liquidation price</dt>
+            <dt>{tx("Liquidation price")}</dt>
             <dd className="bust">{bust ? `$${price(bust)}` : "–"}</dd>
           </div>
-          {impact !== null && level > 1 && (
-            <div>
+          {impact !== null && level > 1 && (<div>
               <dt
-                title={`${market.symbol} ${isLong ? "longs" : "shorts"} already hold ${usdCompact(ahead)}. Past ${usdCompact(BigInt(market.depth) * 1_000_000n)} on a side, a new position keeps less of a small win. Losses and the liquidation price are the same, and the terms are fixed once it opens.`}
-              >
-                Crowded side
-              </dt>
+                title={tx("{0} {1} already hold {2}. Past {3} on a side, a new position keeps less of a small win. Losses and the liquidation price are the same, and the terms are fixed once it opens.", [market.symbol, isLong ? "longs" : "shorts", usdCompact(ahead), usdCompact(BigInt(market.depth) * 1_000_000n)])}
+              >{tx("Crowded side")}</dt>
               <dd className="warn">×{level.toFixed(level < 10 ? 2 : 1)}</dd>
-            </div>
-          )}
+            </div>)}
           <div>
-            <dt>Fee to open</dt>
+            <dt>{tx("Fee to open")}</dt>
             <dd>$0</dd>
           </div>
         </dl>
 
-        {impact !== null && level > 1 && (
-          <p className="note">
-            This side is crowded. A 0.10% win keeps {(keepShare(10, market, impact) * 100).toFixed(0)}% here, {(keepShare(10, market) * 100).toFixed(0)}% on a quiet side; a 1% win keeps{" "}
-            {(keepShare(100, market, impact) * 100).toFixed(0)}%.
-          </p>
-        )}
+        {impact !== null && level > 1 && (<p className="note"><Localized message={"This side is crowded. A 0.10% win keeps {0}% here, {1}% on a quiet side; a 1% win keeps {2}%."} values={[(keepShare(10, market, impact) * 100).toFixed(0), (keepShare(10, market) * 100).toFixed(0), (keepShare(100, market, impact) * 100).toFixed(0)]} /></p>)}
 
         <div className="slip-triggers">
           <button className="trigger-toggle" aria-expanded={withTriggers} onClick={() => setWithTriggers(!withTriggers)}>
-            <span>Take profit / stop loss</span>
-            <span className="trigger-more">{withTriggers ? "Hide" : "Add"}</span>
+            <span>{tx("Take profit / stop loss")}</span>
+            <span className="trigger-more">{withTriggers ? tx("Hide") : tx("Add")}</span>
           </button>
-          {withTriggers && (
-            <TriggerFields market={market} shape={triggerShape} tp={tpText} sl={slText} setTp={setTpText} setSl={setSlText} check={triggerCheck} />
-          )}
+          {withTriggers && (<TriggerFields market={market} shape={triggerShape} tp={tpText} sl={slText} setTp={setTpText} setSl={setSlText} check={triggerCheck} />)}
         </div>
 
-        {queued > 0n && (
-          <label className="check">
-            <input type="checkbox" checked={useQueued} onChange={(e) => setUseQueued(e.target.checked)} />
-            Use queued winnings first ({usd(queued)})
-          </label>
-        )}
+        {queued > 0n && (<label className="check"><Localized message={"{0}Use queued winnings first ({1})"} values={[<input type="checkbox" checked={useQueued} onChange={(e) => setUseQueued(e.target.checked)} />, usd(queued)]} /></label>)}
 
         <button className={`btn big wide slip-go ${tone}`} disabled={action.disabled} onClick={action.run}>
           {action.label}
-          {action.tone === "side" && !action.disabled && !busy && (
-            <small>
+          {action.tone === "side" && !action.disabled && !busy && (<small>
               {leverage}x · {usd(margin ?? 0n)}
-            </small>
-          )}
+            </small>)}
         </button>
 
-        {owner && !session && !PREVIEW && (
-          <p className="note">One signature, no gas. It makes a key in this browser that places your trades without a popup each time. That key can trade; it can never withdraw.</p>
-        )}
+        {owner && !session && !PREVIEW && (<p className="note">{tx("One signature, no gas. It makes a key in this browser that places your trades without a popup each time. That key can trade; it can never withdraw.")}</p>)}
       </div>
 
       <Equity />

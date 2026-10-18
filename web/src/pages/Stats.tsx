@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Hero } from "../components/Hero";
 import { AssetIcon } from "../components/Shell";
@@ -64,13 +65,13 @@ function StatChart({ title, value, lines, detail, empty, loaded, failed, classNa
     : !loaded && !hasHistory ? "Loading exchange history…"
     : !hasHistory ? "Collecting samples. The chart fills in as the exchange runs."
     : !hasActivity ? empty : null;
-  return <section className={`stats-chart ${className}`} aria-label={title}>
-    <header><h3>{title}</h3><b>{value}</b></header>
+  return <section className={`stats-chart ${className}`} aria-label={tx(title)}>
+    <header><h3>{tx(title)}</h3><b>{value}</b></header>
     {lines.length > 1 && <div className="stats-legend">{lines.map((l) => <span key={l.name}><i style={{ background: l.color }} />{l.name}</span>)}</div>}
-    <div className={`stats-plot ${message ? "is-empty" : ""}`} role="img" aria-label={`${title} history. ${message ?? detail}`}>
+    <div className={`stats-plot ${message ? "is-empty" : ""}`} role="img" aria-label={tx("{0} history. {1}", [title, message ?? detail])}>
       {message ? <p>{message}</p> : <Lines lines={lines} format={count ? compact : dollars} labelColor="#4b5675" labelSize={11} lastValueVisible={false} />}
     </div>
-    <p className="stats-chart-note">{detail}</p>
+    <p className="stats-chart-note">{tx(detail)}</p>
   </section>;
 }
 
@@ -107,10 +108,10 @@ export function Stats() {
   const history = { loaded: loaded.history, failed: errors.history };
 
   return <div className="sheet stats-page">
-    <Hero title="Stats" lede="Totals since the exchange opened." actions={<span className="stats-mode">{PREVIEW ? "Practice activity" : "Exchange activity"}</span>} />
-    {PREVIEW && <p className="stats-preview-note">Practice preview. These figures reflect activity saved in this browser.</p>}
+    <Hero title={tx("Stats")} lede={tx("Totals since the exchange opened.")} actions={<span className="stats-mode">{PREVIEW ? tx("Practice activity") : tx("Exchange activity")}</span>} />
+    {PREVIEW && <p className="stats-preview-note">{tx("Practice preview. These figures reflect activity saved in this browser.")}</p>}
 
-    <dl className="stats-summary" aria-label="Exchange totals and current TVL">
+    <dl className="stats-summary" aria-label={tx("Exchange totals and current TVL")}>
       {[
         { label: "Volume", value: house ? usdCompact(house.totals.volume) : "—", exact: house ? usd(house.totals.volume) : "Loading" },
         { label: "Liquidated volume", value: house ? usdCompact(house.totals.bustVolume) : "—", exact: house ? usd(house.totals.bustVolume) : "Loading" },
@@ -118,26 +119,26 @@ export function Stats() {
         { label: "Traders", value: house ? house.totals.traders.toLocaleString("en-US") : "—" },
         { label: "Staker rewards", value: coin?.attached ? usdCompact(coin.stakingState.totalReceived) : "—", exact: coin?.attached ? usd(coin.stakingState.totalReceived) : "Coin not attached" },
         { label: "TVL", value: house ? usdCompact(house.house.treasury) : "—", exact: house ? usd(house.house.treasury) : "Loading" },
-      ].map((f) => <div key={f.label}><dt>{f.label}</dt><dd title={f.exact}>{f.value}</dd></div>)}
+      ].map((f) => <div key={tx(f.label)}><dt>{tx(f.label)}</dt><dd title={f.exact}>{f.value}</dd></div>)}
     </dl>
 
     <div className="stats-toolbar">
-      <div><h2>Exchange activity</h2><p>Charts show up to 24 hours of recorded history.</p></div>
+      <div><h2>{tx("Exchange activity")}</h2><p>{tx("Charts show up to 24 hours of recorded history.")}</p></div>
       <div className="stats-controls">
-        <label className="stats-market">Market<select value={marketId} onChange={(e) => setMarketId(Number(e.target.value))} aria-label="Chart market"><option value={-1}>All markets</option>{markets.map((m) => <option key={m.id} value={m.id}>{m.symbol}</option>)}</select></label>
-        <div className="stats-range" role="group" aria-label="Chart time range">{RANGES.map(([label, value]) => <button type="button" key={label} aria-pressed={seconds === value} onClick={() => setSeconds(value)}>{label}</button>)}</div>
-        <button type="button" className="btn stats-refresh" onClick={refresh} disabled={refreshing}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 10a8 8 0 1 0-1.7 7M20 4v6h-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>{refreshing ? "Refreshing…" : "Refresh"}</button>
+        <label className="stats-market">{tx("Market")}<select value={marketId} onChange={(e) => setMarketId(Number(e.target.value))} aria-label={tx("Chart market")}><option value={-1}>{tx("All markets")}</option>{markets.map((m) => <option key={m.id} value={m.id}>{m.symbol}</option>)}</select></label>
+        <div className="stats-range" role="group" aria-label={tx("Chart time range")}>{RANGES.map(([label, value]) => <button type="button" key={label} aria-pressed={seconds === value} onClick={() => setSeconds(value)}>{tx(label)}</button>)}</div>
+        <button type="button" className="btn stats-refresh" onClick={refresh} disabled={refreshing}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 10a8 8 0 1 0-1.7 7M20 4v6h-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>{refreshing ? tx("Refreshing…") : tx("Refresh")}</button>
       </div>
     </div>
-    {failed && <div className="stats-warning" role="alert">Some stats could not refresh. Available values remain visible. Use Refresh to try again.</div>}
+    {failed && <div className="stats-warning" role="alert">{tx("Some stats could not refresh. Available values remain visible. Use Refresh to try again.")}</div>}
 
     <div className="stats-primary">
-      <StatChart title={market ? `${market.symbol} volume` : "Total volume"} value={vol == null ? "—" : usdCompact(vol)} lines={volume} detail="Cumulative traded notional in USDC." empty="No trading volume recorded in this window yet." className="stats-volume" {...history} />
+      <StatChart title={market ? tx("{0} volume", [market.symbol]) : tx("Total volume")} value={vol == null ? "—" : usdCompact(vol)} lines={volume} detail={tx("Cumulative traded notional in USDC.")} empty={tx("No trading volume recorded in this window yet.")} className="stats-volume" {...history} />
       <section className="stats-markets" aria-labelledby="stats-markets-title">
-        <header><h3 id="stats-markets-title">By market</h3><span>All-time volume</span></header>
-        <table><thead><tr><th scope="col">Market</th><th scope="col">Volume</th><th scope="col">Open interest</th></tr></thead><tbody>
+        <header><h3 id="stats-markets-title">{tx("By market")}</h3><span>{tx("All-time volume")}</span></header>
+        <table><thead><tr><th scope="col">{tx("Market")}</th><th scope="col">{tx("Volume")}</th><th scope="col">{tx("Open interest")}</th></tr></thead><tbody>
           {markets.map((m) => <tr key={m.id} className={marketId === m.id ? "selected" : ""}>
-            <th scope="row"><button type="button" onClick={() => setMarketId(m.id === marketId ? -1 : m.id)} aria-label={`Show ${m.symbol} charts`} aria-pressed={marketId === m.id}><AssetIcon symbol={m.symbol} size={20} />{m.symbol}</button></th>
+            <th scope="row"><button type="button" onClick={() => setMarketId(m.id === marketId ? -1 : m.id)} aria-label={tx("Show {0} charts", [m.symbol])} aria-pressed={marketId === m.id}><AssetIcon symbol={m.symbol} size={20} />{m.symbol}</button></th>
             <td title={house?.totals.volumeByMarket[m.id] == null ? undefined : usd(house.totals.volumeByMarket[m.id])}>{house?.totals.volumeByMarket[m.id] == null ? "—" : usdCompact(house.totals.volumeByMarket[m.id])}</td>
             <td title={house ? usd(big(m.oiLong) + big(m.oiShort)) : undefined}>{house ? usdCompact(big(m.oiLong) + big(m.oiShort)) : "—"}</td>
           </tr>)}
@@ -146,14 +147,14 @@ export function Stats() {
     </div>
 
     <div className="stats-secondary">
-      <StatChart title={market ? `${market.symbol} open interest` : "Open interest"} value={openInterest == null ? "—" : usdCompact(openInterest)} lines={oi} detail="Open notional, split by long and short." empty="No open interest recorded in this window." {...history} />
-      <StatChart title="Total trader PnL" value={house ? usdCompact(house.totals.pnl) : "—"} lines={other.pnl} detail="Cumulative realised trader profit and loss." empty="Trader PnL is $0 throughout this window." {...history} />
+      <StatChart title={market ? tx("{0} open interest", [market.symbol]) : tx("Open interest")} value={openInterest == null ? "—" : usdCompact(openInterest)} lines={oi} detail={tx("Open notional, split by long and short.")} empty={tx("No open interest recorded in this window.")} {...history} />
+      <StatChart title={tx("Total trader PnL")} value={house ? usdCompact(house.totals.pnl) : "—"} lines={other.pnl} detail={tx("Cumulative realised trader profit and loss.")} empty={tx("Trader PnL is $0 throughout this window.")} {...history} />
     </div>
     <div className="stats-tertiary">
-      <StatChart title="TVL" value={house ? usdCompact(house.house.treasury) : "—"} lines={other.tvl} detail="USDC held across the exchange." empty="TVL is $0 throughout this window." {...history} />
-      <StatChart title="Total staking rewards" value={coin?.attached ? usdCompact(coin.stakingState.totalReceived) : "—"} lines={other.rewards} detail="Cumulative USDC received by staking." empty="No staking rewards recorded in this window yet." {...history} />
-      <StatChart title="Total users" value={house ? house.totals.traders.toLocaleString("en-US") : "—"} lines={other.users} detail="Traders recorded by the exchange." empty="No traders recorded in this window yet." count {...history} />
+      <StatChart title={tx("TVL")} value={house ? usdCompact(house.house.treasury) : "—"} lines={other.tvl} detail={tx("USDC held across the exchange.")} empty={tx("TVL is $0 throughout this window.")} {...history} />
+      <StatChart title={tx("Total staking rewards")} value={coin?.attached ? usdCompact(coin.stakingState.totalReceived) : "—"} lines={other.rewards} detail={tx("Cumulative USDC received by staking.")} empty={tx("No staking rewards recorded in this window yet.")} {...history} />
+      <StatChart title={tx("Total users")} value={house ? house.totals.traders.toLocaleString("en-US") : "—"} lines={other.users} detail={tx("Traders recorded by the exchange.")} empty={tx("No traders recorded in this window yet.")} count {...history} />
     </div>
-    <footer className="stats-foot"><span>{lastSample ? `Last chart sample ${ago(lastSample, now)} ago` : "Waiting for the first chart sample"}</span><span>TVL and open interest are current; other headline figures are all-time. Market selection applies to volume and open interest.</span></footer>
+    <footer className="stats-foot"><span>{lastSample ? tx("Last chart sample {0} ago", [ago(lastSample, now)]) : tx("Waiting for the first chart sample")}</span><span>{tx("TVL and open interest are current; other headline figures are all-time. Market selection applies to volume and open interest.")}</span></footer>
   </div>;
 }

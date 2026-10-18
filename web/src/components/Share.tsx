@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { big, duration, price, usd } from "../lib/format";
 import { BRAND } from "../lib/mode";
@@ -207,7 +208,7 @@ export function ShareDialog() {
   const canShareFiles = typeof navigator.canShare === "function";
 
   return (
-    <Dialog title="Share this trade" wide>
+    <Dialog title={tx("Share this trade")} wide>
       <canvas ref={canvas} className="share-card" aria-label={postText(data)} />
       <div className="share-actions">
         <a
@@ -215,9 +216,7 @@ export function ShareDialog() {
           href={`https://x.com/intent/post?text=${encodeURIComponent(postText(data))}&url=${encodeURIComponent(link)}`}
           target="_blank"
           rel="noreferrer"
-        >
-          Post on X
-        </a>
+        >{tx("Post on X")}</a>
         <button
           className="btn"
           disabled={!ready}
@@ -231,9 +230,7 @@ export function ShareDialog() {
               toast("bad", "Could not copy the image", "Download it instead.");
             }
           }}
-        >
-          Copy image
-        </button>
+        >{tx("Copy image")}</button>
         <button
           className="btn"
           disabled={!ready}
@@ -246,11 +243,8 @@ export function ShareDialog() {
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           }}
-        >
-          Download
-        </button>
-        {canShareFiles && (
-          <button
+        >{tx("Download")}</button>
+        {canShareFiles && (<button
             className="btn"
             disabled={!ready}
             onClick={async () => {
@@ -260,13 +254,10 @@ export function ShareDialog() {
               if (!navigator.canShare({ files })) return toast("bad", "This browser cannot share images", "Download it instead.");
               await navigator.share({ files, text: `${postText(data)} ${link}` }).catch(() => {});
             }}
-          >
-            Share
-          </button>
-        )}
+          >{tx("Share")}</button>)}
       </div>
       <p className="note">
-        {code ? "The link on the card is your referral link: you earn a share of the fees of anyone who signs up through it." : "Connect a wallet to put your referral link on the card."}
+        {code ? tx("The link on the card is your referral link: you earn a share of the fees of anyone who signs up through it.") : tx("Connect a wallet to put your referral link on the card.")}
       </p>
     </Dialog>
   );
@@ -292,7 +283,7 @@ export function shareTrade(t: { isLong: boolean | null; leverage: number | null;
 /** The share button: a small square with the share glyph. */
 export function ShareButton({ onClick, label = "Share this trade" }: { onClick: () => void; label?: string }) {
   return (
-    <button className="btn small share-btn" onClick={onClick} title={label} aria-label={label}>
+    <button className="btn small share-btn" onClick={onClick} title={tx(label)} aria-label={tx(label)}>
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6" />
       </svg>

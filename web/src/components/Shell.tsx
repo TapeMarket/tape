@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { claimUsername } from "../lib/actions";
 import { post } from "../lib/api";
@@ -12,6 +13,7 @@ import { Link } from "./Link";
 import { Dialog } from "./Dialog";
 import DepositDialog from "./Deposit";
 import WithdrawDialog from "./Withdraw";
+import { LanguagePicker } from "./LanguagePicker";
 export { Dialog } from "./Dialog";
 export { Link } from "./Link";
 
@@ -47,13 +49,11 @@ export function Popover({ label, className, align, children }: { label: ReactNod
   return (
     <div className="pop" ref={ref}>
       <button className={className} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(!open)}>
-        {label}
+        {tx(label)}
       </button>
-      {open && (
-        <div className={`menu ${align ?? ""}`} role="menu">
+      {open && (<div className={`menu ${align ?? ""}`} role="menu">
           {children}
-        </div>
-      )}
+        </div>)}
     </div>
   );
 }
@@ -90,18 +90,16 @@ function MoreItems() {
     <>
       {MORE.map(([to, label]) => (
         <Link key={to} to={to}>
-          {label}
+          {tx(label)}
         </Link>
       ))}
       {!PREVIEW && previous.length > 0 && <>
         <hr className="menu-rule" />
-        {previous.map(deployment => <a key={deployment.address} href={deployment.siteUrl}>Previous exchange{deployment.version ? ` v${deployment.version}` : ""}</a>)}
+        {previous.map(deployment => <a key={deployment.address} href={deployment.siteUrl}><Localized message={"Previous exchange{0}"} values={[deployment.version ? ` v${deployment.version}` : ""]} /></a>)}
       </>}
       <hr className="menu-rule" />
       {/* The chart library's licence asks for this credit on the site. */}
-      <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
-        Charts by TradingView
-      </a>
+      <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">{tx("Charts by TradingView")}</a>
       {PREVIEW && (
         <button
           onClick={async () => {
@@ -110,9 +108,7 @@ function MoreItems() {
             for (const key of Object.keys(localStorage)) if (key.startsWith("tape:")) localStorage.removeItem(key);
             location.reload();
           }}
-        >
-          Start the preview over
-        </button>
+        >{tx("Start the preview over")}</button>
       )}
     </>
   );
@@ -154,116 +150,98 @@ export function TopBar() {
         <Link to="/" className="top-brand">
           <Wordmark height={26} title={name} />
         </Link>
-        <div className="top-quotes hide-narrow" aria-label="Prices">
+        <div className="top-quotes hide-narrow" aria-label={tx("Prices")}>
           {live.slice(0, 2).map((m) => (
             <Quote key={m.id} id={m.id} symbol={m.symbol} ref24h={m.ref24h} />
           ))}
         </div>
-        <nav className="top-nav" aria-label="Main">
-          <Link to="/trade">Trade</Link>
-          <Link to="/jackpot">Jackpot</Link>
-          <Link to="/vault">Vault</Link>
-          {coin && <Link to="/staking">Staking</Link>}
-          <Link to="/leaderboard">Leaderboard</Link>
-          <Link to="/stats">Stats</Link>
+        <nav className="top-nav" aria-label={tx("Main")}>
+          <Link to="/trade">{tx("Trade")}</Link>
+          <Link to="/jackpot">{tx("Jackpot")}</Link>
+          <Link to="/vault">{tx("Vault")}</Link>
+          {coin && <Link to="/staking">{tx("Staking")}</Link>}
+          <Link to="/leaderboard">{tx("Leaderboard")}</Link>
+          <Link to="/stats">{tx("Stats")}</Link>
           <Popover
             align="right"
             className={inMore ? "on" : ""}
             label={
               <>
-                More <i className="caret" aria-hidden="true" />
+                {tx(" More ")}<i className="caret" aria-hidden="true" />
               </>
             }
           >
             <MoreItems />
           </Popover>
         </nav>
-        {owner ? (
-          <div className="wallet">
+        <LanguagePicker />
+        {owner ? (<div className="wallet">
             <Popover
               align="right"
               className="wallet-main"
               label={
                 <>
                   <i className="wallet-dot" aria-hidden="true" />
-                  <span className="wallet-text" title="Total balance includes cash, margin in open positions and queued winnings.">
-                    <b aria-label={`Total balance ${account ? usd(balance) : "loading"}`}>{account ? usd(balance) : "—"}</b>
+                  <span className="wallet-text" title={tx("Total balance includes cash, margin in open positions and queued winnings.")}>
+                    <b aria-label={tx("Total balance {0}", [account ? usd(balance) : "loading"])}>{account ? usd(balance) : "—"}</b>
                     {queued > 0n
-                      ? <small className="wallet-queue-label">{PREVIEW ? "practice · " : ""}{usd(queued)} queued</small>
-                      : <small>{PREVIEW ? "practice" : (account?.name ?? shortAddress(owner))}</small>}
+                      ? <small className="wallet-queue-label"><Localized message={"{0}{1} queued"} values={[PREVIEW ? tx("practice · ") : "", usd(queued)]} /></small>
+                      : <small>{PREVIEW ? tx("practice") : (account?.name ?? shortAddress(owner))}</small>}
                   </span>
                   <i className="caret" aria-hidden="true" />
                 </>
               }
             >
-              <div className="wallet-summary" role="group" aria-label="Balance breakdown">
+              <div className="wallet-summary" role="group" aria-label={tx("Balance breakdown")}>
                 <strong className="wallet-summary-owner">{account?.name ?? shortAddress(owner)}</strong>
                 <dl>
-                  <div className="wallet-summary-total"><dt>Total balance</dt><dd>{account ? usd(balance) : "—"}</dd></div>
-                  <div><dt>Available to withdraw</dt><dd>{account ? usdExact(available) : "—"}</dd></div>
-                  {margin > 0n && <div><dt>In open positions</dt><dd>{usd(margin)}</dd></div>}
-                  {reserved > 0n && <div><dt>Pending orders</dt><dd>{usd(reserved)}</dd></div>}
-                  <div><dt>Queued winnings</dt><dd>{account ? usd(queued) : "—"}</dd></div>
+                  <div className="wallet-summary-total"><dt>{tx("Total balance")}</dt><dd>{account ? usd(balance) : "—"}</dd></div>
+                  <div><dt>{tx("Available to withdraw")}</dt><dd>{account ? usdExact(available) : "—"}</dd></div>
+                  {margin > 0n && <div><dt>{tx("In open positions")}</dt><dd>{usd(margin)}</dd></div>}
+                  {reserved > 0n && <div><dt>{tx("Pending orders")}</dt><dd>{usd(reserved)}</dd></div>}
+                  <div><dt>{tx("Queued winnings")}</dt><dd>{account ? usd(queued) : "—"}</dd></div>
                 </dl>
-                {queued > 0n && <p>Queued winnings are included in your total. They become withdrawable once the vault pays them.</p>}
+                {queued > 0n && <p>{tx("Queued winnings are included in your total. They become withdrawable once the vault pays them.")}</p>}
               </div>
-              <Link to="/portfolio">Portfolio</Link>
-              {!LEGACY && <button onClick={() => setState({ dialog: "deposit" })}>Deposit</button>}
-              <button onClick={() => setState({ dialog: "withdraw" })}>Withdraw</button>
-              <button onClick={() => navigator.clipboard?.writeText(owner).then(() => toast("info", "Address copied"), () => {})}>Copy address</button>
-              <button onClick={() => setState({ dialog: "username" })}>{account?.name ? "Change username" : "Claim a username"}</button>
+              <Link to="/portfolio">{tx("Portfolio")}</Link>
+              {!LEGACY && <button onClick={() => setState({ dialog: "deposit" })}>{tx("Deposit")}</button>}
+              <button onClick={() => setState({ dialog: "withdraw" })}>{tx("Withdraw")}</button>
+              <button onClick={() => navigator.clipboard?.writeText(owner).then(() => toast("info", "Address copied"), () => {})}>{tx("Copy address")}</button>
+              <button onClick={() => setState({ dialog: "username" })}>{account?.name ? tx("Change username") : tx("Claim a username")}</button>
               <hr className="menu-rule" />
-              <button onClick={disconnect}>Disconnect</button>
+              <button onClick={disconnect}>{tx("Disconnect")}</button>
             </Popover>
-            <button className="wallet-withdraw" onClick={() => setState({ dialog: "withdraw" })} aria-label="Withdraw" title="Withdraw">
+            <button className="wallet-withdraw" onClick={() => setState({ dialog: "withdraw" })} aria-label={tx("Withdraw")} title={tx("Withdraw")}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5" /></svg>
-              <span className="hide-narrow">Withdraw</span>
+              <span className="hide-narrow">{tx("Withdraw")}</span>
             </button>
-            {!LEGACY && <button className="wallet-add" onClick={() => setState({ dialog: "deposit" })} aria-label="Deposit" title="Deposit">
+            {!LEGACY && <button className="wallet-add" onClick={() => setState({ dialog: "deposit" })} aria-label={tx("Deposit")} title={tx("Deposit")}>
               <span aria-hidden="true">+</span>
-              <span className="hide-narrow">Deposit</span>
+              <span className="hide-narrow">{tx("Deposit")}</span>
             </button>}
-          </div>
-        ) : (
-          <button className="wallet-connect" onClick={() => setState({ dialog: "connect" })}>
-            {PREVIEW ? "Start trading" : "Connect wallet"}
-          </button>
-        )}
+          </div>) : (<button className="wallet-connect" onClick={() => setState({ dialog: "connect" })}>
+            {PREVIEW ? tx("Start trading") : tx("Connect wallet")}
+          </button>)}
       </header>
 
       {/* On a phone the menu is a row of tabs along the bottom of the screen, under the thumb. */}
-      <nav className="tabbar" aria-label="Main">
-        <Link to="/trade">
-          <Glyph name="trade" />
-          Trade
-        </Link>
-        <Link to="/portfolio">
-          <Glyph name="portfolio" />
-          Portfolio
-        </Link>
-        <Link to="/vault">
-          <Glyph name="vault" />
-          Vault
-        </Link>
-        {coin && (
-          <Link to="/staking">
-            <Glyph name="coin" />
-            Staking
-          </Link>
-        )}
+      <nav className="tabbar" aria-label={tx("Main")}>
+        <Link to="/trade"><Localized message={"{0}Trade"} values={[<Glyph name="trade" />]} /></Link>
+        <Link to="/portfolio"><Localized message={"{0}Portfolio"} values={[<Glyph name="portfolio" />]} /></Link>
+        <Link to="/vault"><Localized message={"{0}Vault"} values={[<Glyph name="vault" />]} /></Link>
+        {coin && (<Link to="/staking"><Localized message={"{0}Staking"} values={[<Glyph name="coin" />]} /></Link>)}
         <Popover
           align="up"
           className={inMore || path === "/leaderboard" || path === "/stats" || path === "/jackpot" ? "on" : ""}
           label={
             <>
               <Glyph name="more" />
-              More
-            </>
+              {tx(" More ")}</>
           }
         >
-          <Link to="/jackpot">Jackpot</Link>
-          <Link to="/leaderboard">Leaderboard</Link>
-          <Link to="/stats">Stats</Link>
+          <Link to="/jackpot">{tx("Jackpot")}</Link>
+          <Link to="/leaderboard">{tx("Leaderboard")}</Link>
+          <Link to="/stats">{tx("Stats")}</Link>
           <MoreItems />
         </Popover>
       </nav>
@@ -278,7 +256,7 @@ export function Banner() {
   if (offline) {
     return (
       <div className="banner bad">
-        <b>Offline.</b> {offline}
+        <b>{tx("Offline.")}</b> {tx(offline)}
       </div>
     );
   }
@@ -287,9 +265,7 @@ export function Banner() {
   }
   if (source === "dev") {
     return (
-      <div className="banner">
-        <b>Test mode.</b> Local chain {chainId}, play money, simulated prices. Nothing here is real.
-      </div>
+      <div className="banner"><Localized message={"<0>Test mode.</0> Local chain {0}, play money, simulated prices. Nothing here is real."} values={[chainId]} components={[<b />]} /></div>
     );
   }
   return null;
@@ -314,7 +290,7 @@ function Chip({ chip }: { chip: TapeChip }) {
   const symbol = useStore((s) => s.config?.markets[chip.market]?.symbol) ?? "BTC";
   if (chip.type === "open") {
     return (
-      <span className={`tchip ${chip.isLong ? "win" : "loss"}`} title={`${symbol} ${chip.isLong ? "long" : "short"} opened`}>
+      <span className={`tchip ${chip.isLong ? "win" : "loss"}`} title={tx("{0} {1} opened", [symbol, chip.isLong ? "long" : "short"])}>
         <AssetIcon symbol={symbol} size={16} />
         <span className="arrow">{chip.isLong ? "▲" : "▼"}</span>
         {tapeUsd(usdNumber(chip.notional), false)}
@@ -323,7 +299,7 @@ function Chip({ chip }: { chip: TapeChip }) {
   }
   const pnl = usdNumber(chip.pnl);
   return (
-    <span className={`tchip ${chip.busted ? "busted" : pnl >= 0 ? "win" : "loss"}`} title={chip.busted ? `${symbol} position liquidated` : `${symbol} position closed`}>
+    <span className={`tchip ${chip.busted ? "busted" : pnl >= 0 ? "win" : "loss"}`} title={chip.busted ? tx("{0} position liquidated", [symbol]) : tx("{0} position closed", [symbol])}>
       <AssetIcon symbol={symbol} size={16} />
       {tapeUsd(pnl, true)}
     </span>
@@ -333,7 +309,7 @@ function Chip({ chip }: { chip: TapeChip }) {
 export function Tape({ inline = false }: { inline?: boolean }) {
   const tape = useStore((s) => s.tape);
   return (
-    <div className={`tape ${inline ? "inline" : ""}`} aria-label="Latest trades">
+    <div className={`tape ${inline ? "inline" : ""}`} aria-label={tx("Latest trades")}>
       {tape.slice(0, 24).map((chip) => (
         <Chip key={`${chip.type}${chip.id}${chip.time}`} chip={chip} />
       ))}
@@ -354,8 +330,8 @@ function ConnectDialog() {
     return () => clearTimeout(timer);
   }, []);
   return (
-    <Dialog title={PREVIEW ? "Start trading" : "Connect a wallet"}>
-      {options.length === 0 && <p className="note">No wallet found in this browser. Install one such as MetaMask or Rabby, then reload this page.</p>}
+    <Dialog title={PREVIEW ? tx("Start trading") : tx("Connect a wallet")}>
+      {options.length === 0 && <p className="note">{tx("No wallet found in this browser. Install one such as MetaMask or Rabby, then reload this page.")}</p>}
       {options.map((option) => (
         <button
           key={option.id}
@@ -369,13 +345,13 @@ function ConnectDialog() {
         >
           {option.icon && <img src={option.icon} alt="" />}
           {option.name}
-          <small>{busy === option.id ? "Connecting" : option.note}</small>
+          <small>{busy === option.id ? tx("Connecting") : option.note}</small>
         </button>
       ))}
       <p className="note">
         {PREVIEW
-          ? "$10,000 to trade with, kept in this browser. Nothing to install."
-          : "Connecting only shows your address. You sign once more to turn on one-click trading; that key can trade but can never withdraw."}
+          ? tx("$10,000 to trade with, kept in this browser. Nothing to install.")
+          : tx("Connecting only shows your address. You sign once more to turn on one-click trading; that key can trade but can never withdraw.")}
       </p>
     </Dialog>
   );
@@ -388,13 +364,13 @@ function UsernameDialog() {
   const name = text.trim().toLowerCase();
   const valid = /^[a-z0-9_]{3,16}$/.test(name);
   return (
-    <Dialog title="Claim a username">
+    <Dialog title={tx("Claim a username")}>
       <input
         className="input left"
         style={{ height: 36, fontSize: 15 }}
         autoFocus
-        aria-label="Username"
-        placeholder="3 to 16 letters, numbers or _"
+        aria-label={tx("Username")}
+        placeholder={tx("3 to 16 letters, numbers or _")}
         maxLength={16}
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -409,9 +385,9 @@ function UsernameDialog() {
           if (ok) setState({ dialog: null });
         }}
       >
-        {busy ? "Waiting for your signature" : valid ? `Claim ${name}` : "Pick a name"}
+        {busy ? tx("Waiting for your signature") : valid ? tx("Claim {0}", [name]) : tx("Pick a name")}
       </button>
-      <p className="note">It replaces your address on the leaderboard. Signing it costs nothing and moves nothing.</p>
+      <p className="note">{tx("It replaces your address on the leaderboard. Signing it costs nothing and moves nothing.")}</p>
     </Dialog>
   );
 }
@@ -421,8 +397,8 @@ export function Dialogs() {
   const owner = useStore((s) => s.owner);
   const recovery = useStore((s) => s.config?.recovery);
   if (dialog === "connect") return <ConnectDialog />;
-  if (dialog === "deposit" && recovery?.paused) return <Dialog title="Deposits paused"><p>Deposits are unavailable during emergency recovery. Your available trading balance can be withdrawn to your wallet.</p><button className="btn primary" onClick={() => setState({ dialog: "withdraw" })}>Withdraw USDC</button></Dialog>;
-  if (dialog === "deposit" && LEGACY) return <Dialog title="Previous exchange"><p>Deposits have moved to the current exchange.</p><a className="btn primary" href="/trade">Open current Tape</a></Dialog>;
+  if (dialog === "deposit" && recovery?.paused) return <Dialog title={tx("Deposits paused")}><p>{tx("Deposits are unavailable during emergency recovery. Your available trading balance can be withdrawn to your wallet.")}</p><button className="btn primary" onClick={() => setState({ dialog: "withdraw" })}>{tx("Withdraw USDC")}</button></Dialog>;
+  if (dialog === "deposit" && LEGACY) return <Dialog title={tx("Previous exchange")}><p>{tx("Deposits have moved to the current exchange.")}</p><a className="btn primary" href="/trade">{tx("Open current Tape")}</a></Dialog>;
   // Ready with the exchange shell: opening a money action must not wait for another script.
   if (dialog === "deposit") return <DepositDialog key={owner} />;
   if (dialog === "withdraw") return <WithdrawDialog key={owner} />;
@@ -437,8 +413,8 @@ export function Toasts() {
     <div className="toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className={`toast ${t.kind}`}>
-          <b>{t.title}</b>
-          {t.body && <span>{t.body}</span>}
+          <b>{tx(t.title)}</b>
+          {t.body && <span>{tx(t.body)}</span>}
         </div>
       ))}
     </div>

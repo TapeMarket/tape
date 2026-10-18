@@ -1,4 +1,5 @@
 // Number formatting. Everything on screen goes through here so figures line up and read the same.
+import { getLocale } from "./i18n";
 
 const usdFmt = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -102,19 +103,23 @@ export function shortAddress(address: string): string {
 /** "12s", "4m", "3h", "2d" */
 export function ago(unixSeconds: number, now: number): string {
   const s = Math.max(0, now - unixSeconds);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
+  const units = timeUnits();
+  if (s < 60) return `${s}${units[0]}`;
+  if (s < 3600) return `${Math.floor(s / 60)}${units[1]}`;
+  if (s < 86400) return `${Math.floor(s / 3600)}${units[2]}`;
+  return `${Math.floor(s / 86400)}${units[3]}`;
 }
+const TIME_UNITS = { en: ["s", "m", "h", "d"], "zh-CN": ["秒", "分", "小时", "天"], ru: ["с", "мин", "ч", "д"], ko: ["초", "분", "시간", "일"], ja: ["秒", "分", "時間", "日"] };
+const timeUnits = () => TIME_UNITS[getLocale()];
 
 /** How long something lasted: "8s", "3m 12s", "2h 05m", "3d 4h" */
 export function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
-  return `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h`;
+  const units = timeUnits();
+  if (s < 60) return `${s}${units[0]}`;
+  if (s < 3600) return `${Math.floor(s / 60)}${units[1]} ${String(s % 60).padStart(2, "0")}${units[0]}`;
+  if (s < 86400) return `${Math.floor(s / 3600)}${units[2]} ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}${units[1]}`;
+  return `${Math.floor(s / 86400)}${units[3]} ${Math.floor((s % 86400) / 3600)}${units[2]}`;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -123,6 +128,7 @@ const two = (n: number) => String(n).padStart(2, "0");
 /** "10 Oct 2026 20:06:52", in the reader's own time zone. */
 export function dateTime(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);
+  if (getLocale() !== "en") return new Intl.DateTimeFormat(getLocale(), { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(d);
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 

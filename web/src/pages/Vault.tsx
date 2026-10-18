@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import { Hero } from "../components/Hero";
 import { PageSection } from "../components/PageSection";
 import { Link } from "../components/Shell";
@@ -31,9 +32,9 @@ export function Vault() {
   return (
     <div className="sheet work-page vault-page">
       <Hero
-        title="Vault"
-        lede="The vault is the other side of every position. It pays winners out of what losers lose, and queues any win it cannot pay yet."
-        actions={<Link to="/trade" className="btn primary">Trade</Link>}
+        title={tx("Vault")}
+        lede={tx("The vault is the other side of every position. It pays winners out of what losers lose, and queues any win it cannot pay yet.")}
+        actions={<Link to="/trade" className="btn primary">{tx("Trade")}</Link>}
         figures={[
           { label: "Vault value", value: house ? money(funds) : "–", tone: tone(funds), hint: "Its balance plus what it is up or down on open positions." },
           { label: "Open interest", value: house ? usdCompact(open) : "–", hint: "Everything open on both sides, at size." },
@@ -43,13 +44,13 @@ export function Vault() {
         ]}
       />
       <ExchangeDataNotice data={data} />
-      <PageSection title="Balance and positions" detail="The vault's value beside the positions it is backing.">
+      <PageSection title={tx("Balance and positions")} detail={tx("The vault's value beside the positions it is backing.")}>
         <div className="cells vault-overview"><HouseFunds /><UserPositions /></div>
       </PageSection>
-      <PageSection title="Market risk" detail="Explore exposure, liquidation levels and the effect of a price move.">
+      <PageSection title={tx("Market risk")} detail={tx("Explore exposure, liquidation levels and the effect of a price move.")}>
         <div className="cells vault-risk"><Exposure /><LiquidationHeatmap /><HousePnl /><PositionTopology /></div>
       </PageSection>
-      <PageSection title="Payouts and rewards" detail="Wins waiting to be paid, your place in the queue and rewards distributed.">
+      <PageSection title={tx("Payouts and rewards")} detail={tx("Wins waiting to be paid, your place in the queue and rewards distributed.")}>
         <div className="cells vault-payouts"><QueueStats /><QueuePlacement /><QueueDebt /><CoinCard /></div>
       </PageSection>
     </div>

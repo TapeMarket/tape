@@ -1,3 +1,4 @@
+import { tx } from "./lib/i18n";
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Banner, Dialogs, Toasts, TopBar } from "./components/Shell";
 import { PAGE_LOADERS } from "./lib/route-preload";
@@ -58,10 +59,10 @@ export default function ExchangeApp() {
     <Banner />
     <RecoveryBanner />
     <PreviousExchange />
-    <main className="page"><Suspense fallback={<div className="empty" role="status">Loading page…</div>}>
+    <main className="page"><Suspense fallback={<div className="empty" role="status">{tx("Loading page…")}</div>}>
       {ready ? <Page /> : <div className="empty" role="status" style={{ minHeight: "50vh", display: "grid", placeContent: "center", gap: 16, textAlign: "center" }}>
-        <span>{offline ? "The exchange is unreachable. Reconnecting…" : "Connecting to Tape…"}</span>
-        {offline && <button className="btn" onClick={() => location.reload()}>Try again</button>}
+        <span>{offline ? tx("The exchange is unreachable. Reconnecting…") : tx("Connecting to Tape…")}</span>
+        {offline && <button className="btn" onClick={() => location.reload()}>{tx("Try again")}</button>}
       </div>}
     </Suspense></main>
     <Dialogs />

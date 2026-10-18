@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { Hero } from "../components/Hero";
 import { useEffect, useRef, useState } from "react";
 import { Panel } from "../components/Panels";
@@ -76,24 +77,20 @@ export function Referrals() {
   return (
     <div className="sheet work-page refs referrals-page">
       <Hero
-        title="Referrals"
+        title={tx("Referrals")}
         lede={
           <>
-            Send traders your link. You earn <b>{share}% of every fee</b> the exchange takes on their trades, in USDC, for as long as they trade.
-          </>
+            {tx(" Send traders your link. You earn ")}<b><Localized message={"{0}% of every fee"} values={[share]} /></b> {tx(" the exchange takes on their trades, in USDC, for as long as they trade. ")}</>
         }
         figures={figures.map(([label, value]) => ({ label, value }))}
       />
 
       <section className="referral-share" aria-labelledby="referral-link-title">
         <div className="referral-share-main">
-          <h2 id="referral-link-title">Your next trader starts here.</h2>
-          <p>One link. Every referred trade, tracked in one place.</p>
-          {PREVIEW ? (
-            <p className="referral-preview">You’re in practice mode. Referral tracking is available on the live exchange.</p>
-          ) : link ? (
-            <div className="refs-link">
-              <input className="referral-url" aria-label="Your referral link" value={link} readOnly onFocus={(e) => e.target.select()} />
+          <h2 id="referral-link-title">{tx("Your next trader starts here.")}</h2>
+          <p>{tx("One link. Every referred trade, tracked in one place.")}</p>
+          {PREVIEW ? (<p className="referral-preview">{tx("You’re in practice mode. Referral tracking is available on the live exchange.")}</p>) : link ? (<div className="refs-link">
+              <input className="referral-url" aria-label={tx("Your referral link")} value={link} readOnly onFocus={(e) => e.target.select()} />
               <button
                 className="btn primary"
                 onClick={async () => {
@@ -101,38 +98,33 @@ export function Referrals() {
                   catch { setCopyError(true); }
                 }}
               >
-                {copied ? "Copied" : "Copy link"}
+                {copied ? tx("Copied") : tx("Copy link")}
               </button>
-            </div>
-          ) : (
-            <div className="refs-link">
-              <span className="soft">Connect your wallet to create your personal referral link.</span>
-              <button className="btn primary" onClick={() => setState({ dialog: "connect" })}>
-                Connect wallet
-              </button>
-            </div>
-          )}
-          {copyError && <p className="note" role="status">Couldn’t copy automatically. Select the link above and copy it.</p>}
+            </div>) : (<div className="refs-link">
+              <span className="soft">{tx("Connect your wallet to create your personal referral link.")}</span>
+              <button className="btn primary" onClick={() => setState({ dialog: "connect" })}>{tx("Connect wallet")}</button>
+            </div>)}
+          {copyError && <p className="note" role="status">{tx("Couldn’t copy automatically. Select the link above and copy it.")}</p>}
           {owner && !PREVIEW && (page ? <CustomReferral key={owner} saved={page.customCode ?? null} onCreated={code => {
             if (getState().owner !== owner) return;
             justCreated.current = { owner, code };
             setPage(last => last ? { ...last, code, customCode: code } : last);
-          }} /> : <p className="note">{error ? "Custom link settings are unavailable. Retry below." : "Loading custom link settings…"}</p>)}
-          {page?.referrer && <p className="note">You were referred by {nameOf(page.referrer)}.</p>}
+          }} /> : <p className="note">{error ? tx("Custom link settings are unavailable. Retry below.") : tx("Loading custom link settings…")}</p>)}
+          {page?.referrer && <p className="note"><Localized message={"You were referred by {0}."} values={[nameOf(page.referrer)]} /></p>}
         </div>
         <dl className="referral-terms">
-          <div><dt>Your share of their fees</dt><dd>{share}%</dd></div>
-          <div><dt>Paid to your wallet in</dt><dd>USDC</dd></div>
-          <div><dt>Extra fees for your traders</dt><dd>$0</dd></div>
+          <div><dt>{tx("Your share of their fees")}</dt><dd>{share}%</dd></div>
+          <div><dt>{tx("Paid to your wallet in")}</dt><dd>{tx("USDC")}</dd></div>
+          <div><dt>{tx("Extra fees for your traders")}</dt><dd>$0</dd></div>
         </dl>
       </section>
 
-      <PageSection title="Your referral network" detail="Volume, fees and earnings from traders who joined through your link.">
-      {error && <div className="page-feedback" role="alert"><span>Couldn’t refresh referrals.{page ? " Showing the last available totals." : " Your totals are unavailable."}</span><button className="btn small" onClick={() => setRetry((n) => n + 1)}>Retry</button></div>}
-      <Panel title="Traders you referred" tools={<span className="soft">{page ? `${referred.length} trader${referred.length === 1 ? "" : "s"}` : owner && !PREVIEW && !error ? "Loading…" : "USDC rewards"}</span>}>
+      <PageSection title={tx("Your referral network")} detail={tx("Volume, fees and earnings from traders who joined through your link.")}>
+      {error && <div className="page-feedback" role="alert"><span><Localized message={"Couldn’t refresh referrals.{0}"} values={[page ? tx(" Showing the last available totals.") : tx(" Your totals are unavailable.")]} /></span><button className="btn small" onClick={() => setRetry((n) => n + 1)}>{tx("Retry")}</button></div>}
+      <Panel title={tx("Traders you referred")} tools={<span className="soft">{page ? tx("Traders: {0}", [referred.length]) : owner && !PREVIEW && !error ? tx("Loading…") : tx("USDC rewards")}</span>}>
         <Table
           head={["Trader", ["Trades", "r"], ["Volume", "r"], ["Fees paid", "r"], ["You earned", "r"]]}
-          empty={error && !page ? "Referral data is unavailable. Retry above." : PREVIEW ? "Referrals are tracked on the live exchange, outside practice mode." : !owner ? "Connect a wallet to see who came through your link." : !page ? "Loading your referral network…" : "Nobody yet. Share your link to bring your first trader to Tape."}
+          empty={error && !page ? tx("Referral data is unavailable. Retry above.") : PREVIEW ? tx("Referrals are tracked on the live exchange, outside practice mode.") : !owner ? tx("Connect a wallet to see who came through your link.") : !page ? tx("Loading your referral network…") : tx("Nobody yet. Share your link to bring your first trader to Tape.")}
         >
           {referred.map((r) => (
             <tr key={r.address}>
@@ -149,17 +141,11 @@ export function Referrals() {
       </Panel>
       </PageSection>
 
-      <PageSection title="How referrals work">
+      <PageSection title={tx("How referrals work")}>
       <dl className="referral-rules">
-        <div><dt>Who counts</dt><dd>Somebody who opens the site through your link and then turns on one-click trading with a wallet that has not traded here
-          before. A wallet has one referrer, for good, and cannot refer itself.
-        </dd></div>
-        <div><dt>What you earn</dt><dd>{share}% of each fee on their trades: half of the team's share of it. The stakers' half is not touched, and the trader
-          pays nothing extra.
-        </dd></div>
-        <div><dt>How it is paid</dt><dd>What you earn adds up here as their trades close. The team sends it in USDC to this wallet, and what has been sent shows
-          as Paid.
-        </dd></div>
+        <div><dt>{tx("Who counts")}</dt><dd>{tx("Somebody who opens the site through your link and then turns on one-click trading with a wallet that has not traded here before. A wallet has one referrer, for good, and cannot refer itself.")}</dd></div>
+        <div><dt>{tx("What you earn")}</dt><dd><Localized message={"{0}% of each fee on their trades: half of the team's share of it. The stakers' half is not touched, and the trader pays nothing extra."} values={[share]} /></dd></div>
+        <div><dt>{tx("How it is paid")}</dt><dd>{tx("What you earn adds up here as their trades close. The team sends it in USDC to this wallet, and what has been sent shows as Paid.")}</dd></div>
       </dl>
       </PageSection>
     </div>

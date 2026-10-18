@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { clockText, useJackpot } from "../lib/jackpot";
 import { nameOf } from "../lib/names";
 import { useEffect, useRef, useState } from "react";
@@ -96,9 +97,9 @@ function JackpotChip() {
   if (!jackpot) return null;
   return (
     <Link to="/jackpot" className="jp-chip">
-      <span>Rekt Jackpot</span>
+      <span>{tx("Rekt Jackpot")}</span>
       <b>{usd(jackpot.prize)}</b>
-      <small>draws in {clockText(jackpot.end - now)}</small>
+      <small><Localized message={"draws in {0}"} values={[clockText(jackpot.end - now)]} /></small>
     </Link>
   );
 }
@@ -112,7 +113,7 @@ function Print({ chip, symbol, now }: { chip: TapeChip; symbol: string; now: num
   return (
     <li className={`print ${tone}`}>
       <AssetIcon symbol={symbol} size={14} />
-      <span className="print-k">{what}</span>
+      <span className="print-k">{tx(what)}</span>
       <span className="print-v">{opened ? tapeUsd(usdNumber(chip.notional), false) : tapeUsd(pnl, true)}</span>
       <span className="print-t">{now - chip.time < 60 ? `${Math.max(0, now - chip.time)}s` : ago(chip.time, now)}</span>
     </li>
@@ -124,19 +125,15 @@ function Prints() {
   const markets = useStore((s) => s.config?.markets);
   const now = useSecond();
   return (
-    <section className="prints" aria-label="Latest trades">
+    <section className="prints" aria-label={tx("Latest trades")}>
       <header className="rail-head">
-        <span>Live trades</span>
+        <span>{tx("Live trades")}</span>
       </header>
-      {tape.length ? (
-        <ol className="prints-list">
+      {tape.length ? (<ol className="prints-list">
           {tape.slice(0, 40).map((chip) => (
             <Print key={`${chip.type}${chip.id}${chip.time}`} chip={chip} symbol={markets?.[chip.market]?.symbol ?? "BTC"} now={now} />
           ))}
-        </ol>
-      ) : (
-        <p className="empty">No trades yet. Yours will show here.</p>
-      )}
+        </ol>) : (<p className="empty">{tx("No trades yet. Yours will show here.")}</p>)}
     </section>
   );
 }
@@ -154,22 +151,18 @@ function ChartControls({ market, step, setStep }: { market: Market; step: number
   else lastLine.current = step;
   return (
     <span className="seg chart-pill">
-      <button aria-pressed={!candles} onClick={() => setStep(lastLine.current)} title="Every price as it prints">
-        Line
-      </button>
-      <button aria-pressed={candles} onClick={() => setStep(lastCandles.current)} title="Open, high, low and close of each step">
-        Candles
-      </button>
-      <select aria-label="Chart step" value={step} onChange={(e) => setStep(Number(e.target.value))}>
+      <button aria-pressed={!candles} onClick={() => setStep(lastLine.current)} title={tx("Every price as it prints")}>{tx("Line")}</button>
+      <button aria-pressed={candles} onClick={() => setStep(lastCandles.current)} title={tx("Open, high, low and close of each step")}>{tx("Candles")}</button>
+      <select aria-label={tx("Chart step")} value={step} onChange={(e) => setStep(Number(e.target.value))}>
         {STEPS.map(([label, seconds]) => (
           <option key={label} value={seconds}>
-            {label}
+            {tx(label)}
           </option>
         ))}
       </select>
-      <span className={`live ${live ? "" : "off"}`} title={live ? "Prices are arriving" : "Waiting for the next price"}>
+      <span className={`live ${live ? "" : "off"}`} title={live ? tx("Prices are arriving") : tx("Waiting for the next price")}>
         <i />
-        {live ? "Live" : "Waiting"}
+        {live ? tx("Live") : tx("Waiting")}
       </span>
     </span>
   );
@@ -191,20 +184,20 @@ function Board({ market }: { market: Market }) {
         <span className="board-sym">
           <AssetIcon symbol={market.symbol} size={24} />
           {market.symbol}
-          <span className="dim">/USD</span>
+          <span className="dim">{tx("/USD")}</span>
         </span>
         <span className="board-px">{tick ? price(tick.p) : "–"}</span>
         {change !== null && <span className={`board-chg ${change >= 0 ? "up" : "down"}`}>{percent(change, 2, true)}</span>}
       </div>
       <div className="board-stats hide-narrow">
         <span className="board-stat">
-          <small>Tape volume 24h</small>
+          <small>{tx("Tape volume 24h")}</small>
           <b>{house ? usdCompact(house.totals.volume24hByMarket[market.id]) : "–"}</b>
         </span>
-        <span className="board-stat board-oi" title="Open positions on each side. Past the market's depth, a crowded side keeps less of a small win.">
+        <span className="board-stat board-oi" title={tx("Open positions on each side. Past the market's depth, a crowded side keeps less of a small win.")}>
           <small>
-            <span className="up">Long {info ? usdCompact(info.oiLong) : "–"}</span>
-            <span className="down">Short {info ? usdCompact(info.oiShort) : "–"}</span>
+            <span className="up"><Localized message={"Long {0}"} values={[info ? usdCompact(info.oiLong) : "–"]} /></span>
+            <span className="down"><Localized message={"Short {0}"} values={[info ? usdCompact(info.oiShort) : "–"]} /></span>
           </small>
           <span className="oi-bar">
             <i style={{ width: `${(longShare * 100).toFixed(1)}%` }} />
@@ -220,43 +213,41 @@ function StatusTab() {
   const config = useStore((s) => s.config);
   const now = useSecond();
   usePoll(() => loadStatus().then(setStatus), 5_000);
-  if (!status || !config) return <div className="empty">Checking.</div>;
+  if (!status || !config) return <div className="empty">{tx("Checking.")}</div>;
   return (
     <div className="panel-body" style={{ maxWidth: 520, paddingTop: 12 }}>
       {status.feeds.map((feed) => (
         <div className="kv" key={feed.market}>
-          <span>{feed.symbol} price feed</span>
+          <span><Localized message={"{0} price feed"} values={[feed.symbol]} /></span>
           <span>
-            <i className={`dot ${feed.time && now - feed.time <= 6 ? "" : "bad"}`} /> {feed.time ? `${ago(feed.time, now)} ago` : "no price yet"}
+            <i className={`dot ${feed.time && now - feed.time <= 6 ? "" : "bad"}`} /> {feed.time ? tx("{0} ago", [ago(feed.time, now)]) : tx("no price yet")}
           </span>
         </div>
       ))}
       <div className="kv">
-        <span>Prices from</span>
+        <span>{tx("Prices from")}</span>
         <span>
           {status.source === "hyperliquid"
-            ? "Hyperliquid"
+            ? tx("Hyperliquid")
             : status.source === "hermes"
-              ? "Pyth"
+              ? tx("Pyth")
               : status.source === "preview"
-                ? "Hyperliquid (preview)"
-                : "simulated (local test)"}
+                ? tx("Hyperliquid (preview)")
+                : tx("simulated (local test)")}
         </span>
       </div>
       <div className="kv">
-        <span>New positions</span>
-        <span className={status.opensPaused ? "warn" : ""}>{status.opensPaused ? "Paused" : "Open"}</span>
+        <span>{tx("New positions")}</span>
+        <span className={status.opensPaused ? "warn" : ""}>{status.opensPaused ? tx("Paused") : tx("Open")}</span>
       </div>
       <div className="kv">
-        <span>Fill delay</span>
-        <span>{config.timing.execDelay === 0 ? "Next fresh price · no fixed wait" : `${config.timing.execDelay}s after you click`}</span>
+        <span>{tx("Fill delay")}</span>
+        <span>{config.timing.execDelay === 0 ? tx("Next fresh price · no fixed wait") : tx("{0}s after you click", [config.timing.execDelay])}</span>
       </div>
-      {status.chainId !== 0 && (
-        <div className="kv">
-          <span>Indexed to block</span>
+      {status.chainId !== 0 && (<div className="kv">
+          <span>{tx("Indexed to block")}</span>
           <span>#{Number(status.block).toLocaleString("en-US")}</span>
-        </div>
-      )}
+        </div>)}
     </div>
   );
 }
@@ -283,10 +274,10 @@ export function Trade() {
 
   return (
     <div className="tt">
-      <aside className="tt-rail" aria-label="Markets">
+      <aside className="tt-rail" aria-label={tx("Markets")}>
         <header className="rail-head">
-          <span>Markets</span>
-          <span className="dim">USDC, up to {Math.max(...markets.map((m) => m.maxLeverage))}x</span>
+          <span>{tx("Markets")}</span>
+          <span className="dim"><Localized message={"USDC, up to {0}x"} values={[Math.max(...markets.map((m) => m.maxLeverage))]} /></span>
         </header>
         <div className="mcards">
           {markets
@@ -299,7 +290,7 @@ export function Trade() {
         <Prints />
       </aside>
 
-      <section className="tt-chart" aria-label={`${market.symbol} price`}>
+      <section className="tt-chart" aria-label={tx("{0} price", [market.symbol])}>
         <Board market={market} />
         <div className="chart-wrap">
           <div className="chart-tools">
@@ -312,9 +303,9 @@ export function Trade() {
 
       <Ticket market={market} onOrder={() => setTab("positions")} />
 
-      <section className="tt-book" aria-label="Your positions">
+      <section className="tt-book" aria-label={tx("Your positions")}>
         <div className="tt-book-head">
-          <PageTabs id="trade-tabs" label="Trading account" value={tab} onChange={setTab} tabs={(["positions", "history", "status"] as const).map((id) => ({ id, label: <>{id[0].toUpperCase() + id.slice(1)}{id === "positions" && owner ? <><span className="count">{positionCount}</span>{pendingCount > 0 && <span className="count pending-count">{pendingCount} pending</span>}</> : null}</> }))} />
+          <PageTabs id="trade-tabs" label={tx("Trading account")} value={tab} onChange={setTab} tabs={(["positions", "history", "status"] as const).map((id) => ({ id, label: <>{tx(id[0].toUpperCase() + id.slice(1))}{id === "positions" && owner ? <><span className="count">{positionCount}</span>{pendingCount > 0 && <span className="count pending-count"><Localized message={"{0} pending"} values={[pendingCount]} /></span>}</> : null}</> }))} />
           <button
             className="btn small"
             disabled={open === 0 || closingAll || Boolean(offline)}
@@ -329,13 +320,11 @@ export function Trade() {
                 setClosingAll(false);
               }, 1500);
             }}
-          >
-            Close all
-          </button>
+          >{tx("Close all")}</button>
         </div>
         <div id="trade-tabs-panel" role="tabpanel" aria-labelledby={`trade-tabs-${tab}`} tabIndex={0}>
         {tab === "positions" && <PositionStrips />}
-        {tab === "history" && (owner ? <TradesTable trades={trades.slice(0, 50)} /> : <div className="empty">Connect a wallet to view your history.</div>)}
+        {tab === "history" && (owner ? <TradesTable trades={trades.slice(0, 50)} /> : <div className="empty">{tx("Connect a wallet to view your history.")}</div>)}
         {tab === "status" && <StatusTab />}
         </div>
       </section>

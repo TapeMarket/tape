@@ -1,6 +1,4 @@
-// The panels the House, coin, Stats and Dashboard pages are assembled from. Each reads what it
-// needs from the store; the page (or the dashboard) only decides where it goes.
-
+import { tx, Localized } from "../lib/i18n";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { loadCoin, loadHouse, loadPrices, loadSeries, onTick } from "../lib/api";
 import { big, coinFull, compact, dollars, usd, usdCompact, usdNumber } from "../lib/format";
@@ -25,8 +23,8 @@ export function Panel({ title, sub, tools, area, chart = false, children }: { ti
     >
       <div className="panel-head">
         {chrome?.before}
-        <h2 className="title">{title}</h2>
-        {sub && <span className="sub">{sub}</span>}
+        <h2 className="title">{tx(title)}</h2>
+        {sub && <span className="sub">{tx(sub)}</span>}
         <div className="tools">
           {tools}
           {chrome?.after}
@@ -68,7 +66,7 @@ export function useExchangeData() {
 
 export function ExchangeDataNotice({ data }: { data: ReturnType<typeof useExchangeData> }) {
   if (!data.errors.length) return null;
-  return <div className="page-feedback" role="alert"><span>Couldn’t refresh {data.errors.join(", ")}. Showing the last available data where possible.</span><button className="btn small" disabled={data.refreshing} onClick={() => void data.retry()}>{data.refreshing ? "Refreshing…" : "Retry"}</button></div>;
+  return <div className="page-feedback" role="alert"><span><Localized message={"Couldn’t refresh {0}. Showing the last available data where possible."} values={[data.errors.join(", ")]} /></span><button className="btn small" disabled={data.refreshing} onClick={() => void data.retry()}>{data.refreshing ? tx("Refreshing…") : tx("Retry")}</button></div>;
 }
 
 /** Current prices as plain numbers, refreshed once a second: often enough for a picture. */
@@ -107,14 +105,14 @@ function useRange(): [SeriesPoint[], ReactNode] {
   }, [series, seconds]);
   const control = (
     <>
-      <select aria-label="Time range" value={seconds} onChange={(e) => setSeconds(Number(e.target.value))}>
+      <select aria-label={tx("Time range")} value={seconds} onChange={(e) => setSeconds(Number(e.target.value))}>
         {RANGES.map(([label, value]) => (
           <option key={label} value={value}>
-            {label}
+            {tx(label)}
           </option>
         ))}
       </select>
-      <span className="live">Live</span>
+      <span className="live">{tx("Live")}</span>
     </>
   );
   return [window, control];
@@ -128,7 +126,7 @@ function useMarket(): [number, ReactNode] {
     id,
     <span key="market" className="panel-market-picker">
     {selected && <AssetIcon symbol={selected.symbol} size={18} />}
-    <select aria-label="Market" value={id} onChange={(e) => setId(Number(e.target.value))}>
+    <select aria-label={tx("Market")} value={id} onChange={(e) => setId(Number(e.target.value))}>
       {markets.map((m) => (
         <option key={m.id} value={m.id}>
           {m.symbol}
@@ -163,27 +161,27 @@ export function UserPositions({ area }: { area?: string }) {
   }
   const net = (a: bigint, b: bigint) => usdCompact(a > b ? a - b : b - a);
   return (
-    <Panel title="Open positions" area={area}>
+    <Panel title={tx("Open positions")} area={area}>
       <div className="panel-body">
         <div className="kv">
-          <span>Open interest</span>
+          <span>{tx("Open interest")}</span>
           <span>{house ? usd(long + short) : "–"}</span>
         </div>
         <div className="kv">
-          <span>Open margin</span>
+          <span>{tx("Open margin")}</span>
           <span>{house ? usd(house.totals.openMargin) : "–"}</span>
         </div>
         <div className="kv">
-          <span>Open positions</span>
+          <span>{tx("Open positions")}</span>
           <span>{house ? house.totals.openPositions.toLocaleString("en-US") : "–"}</span>
         </div>
         <table className="oi-table">
           <thead>
             <tr>
               <th />
-              <th>Long</th>
-              <th>Short</th>
-              <th>Net</th>
+              <th>{tx("Long")}</th>
+              <th>{tx("Short")}</th>
+              <th>{tx("Net")}</th>
             </tr>
           </thead>
           <tbody>
@@ -196,7 +194,7 @@ export function UserPositions({ area }: { area?: string }) {
               </tr>
             ))}
             <tr className="total">
-              <td>Total</td>
+              <td>{tx("Total")}</td>
               <td>{usdCompact(long)}</td>
               <td>{usdCompact(short)}</td>
               <td>{net(long, short)}</td>
@@ -222,31 +220,31 @@ export function HouseStats({ area }: { area?: string }) {
   const { house, openPnl, balance, funds } = useHouseFigures();
   const tone = (n: number) => (n > 0 ? "up" : n < 0 ? "down" : "");
   return (
-    <Panel title="Stats" area={area}>
+    <Panel title={tx("Stats")} area={area}>
       <div className="panel-body" style={{ display: "flex", flexDirection: "column" }}>
         <div className="kv lead">
-          <span title="What the vault is worth right now: its balance plus what it is up or down on open positions.">Vault value</span>
+          <span title={tx("What the vault is worth right now: its balance plus what it is up or down on open positions.")}>{tx("Vault value")}</span>
           <span className={tone(funds)}>{house ? dollarsFull(funds) : "–"}</span>
         </div>
         <div className="kv rule">
-          <span title="Cash the vault holds, less what it owes queued winners.">Vault cash</span>
+          <span title={tx("Cash the vault holds, less what it owes queued winners.")}>{tx("Vault cash")}</span>
           <span>{house ? dollarsFull(balance) : "–"}</span>
         </div>
         <div className="kv">
-          <span title="The vault's result if every open position closed at this instant.">Vault open PnL</span>
+          <span title={tx("The vault's result if every open position closed at this instant.")}>{tx("Vault open PnL")}</span>
           <span className={tone(openPnl)}>{house ? dollarsFull(openPnl) : "–"}</span>
         </div>
         <div className="kv">
-          <span title="Winnings owed to traders and not yet paid.">Queued wins</span>
+          <span title={tx("Winnings owed to traders and not yet paid.")}>{tx("Queued wins")}</span>
           <span className={house && big(house.house.totalQueued) > 0n ? "warn" : ""}>{house ? usd(house.house.totalQueued) : "–"}</span>
         </div>
         <div className="spacer" style={{ minHeight: 18 }} />
         <div className="kv">
-          <span title="All the USDC the exchange holds: balances, margin and the vault.">TVL</span>
+          <span title={tx("All the USDC the exchange holds: balances, margin and the vault.")}>{tx("TVL")}</span>
           <span>{house ? usdCompact(house.house.treasury) : "–"}</span>
         </div>
         <div className="kv">
-          <span>Volume</span>
+          <span>{tx("Volume")}</span>
           <span>{house ? usdCompact(house.totals.volume) : "–"}</span>
         </div>
       </div>
@@ -260,8 +258,8 @@ export function CoinCard({ area }: { area?: string }) {
   const coin = useStore((s) => s.coin);
   if (!coin?.attached) {
     return (
-      <Panel title="Coin" area={area}>
-        <div className="panel-body dim">No coin is attached to this exchange yet.</div>
+      <Panel title={tx("Coin")} area={area}>
+        <div className="panel-body dim">{tx("No coin is attached to this exchange yet.")}</div>
       </Panel>
     );
   }
@@ -269,20 +267,20 @@ export function CoinCard({ area }: { area?: string }) {
     <Panel title={coin.symbol} area={area}>
       <div className="panel-body">
         <div className="kv">
-          <span title="Paid out to losing traders so far.">{coin.symbol} mined</span>
+          <span title={tx("Paid out to losing traders so far.")}><Localized message={"{0} mined"} values={[coin.symbol]} /></span>
           <span>{coinFull(coin.mining.mined)}</span>
         </div>
         <div className="kv">
-          <span>{coin.symbol} staked</span>
+          <span><Localized message={"{0} staked"} values={[coin.symbol]} /></span>
           <span>{coinFull(coin.stakingState.totalStaked)}</span>
         </div>
         <div className="kv">
-          <span>Staker rewards</span>
+          <span>{tx("Staker rewards")}</span>
           <span>{usd(coin.stakingState.totalReceived)}</span>
         </div>
         <div className="kv">
-          <span>Reward token and rate</span>
-          <span>USDC / {coin.rewardRate}%</span>
+          <span>{tx("Reward token and rate")}</span>
+          <span><Localized message={"USDC / {0}%"} values={[coin.rewardRate]} /></span>
         </div>
       </div>
     </Panel>
@@ -299,7 +297,7 @@ export function HouseFunds({ area }: { area?: string }) {
       chart
       title={
         <span className="seg">
-          <span className="label">Vault value</span>
+          <span className="label">{tx("Vault value")}</span>
           <span>{house ? dollarsFull(funds) : "–"}</span>
         </span>
       }
@@ -325,7 +323,7 @@ export function Exposure({ area }: { area?: string }) {
     <Panel
       area={area}
       chart
-      title="Exposure"
+      title={tx("Exposure")}
       tools={
         <>
           <span className="seg">{marketSelect}</span>
@@ -335,11 +333,11 @@ export function Exposure({ area }: { area?: string }) {
     >
       <div className="legend">
         <span style={{ color: GREEN }}>
-          <span className="panel-market-label"><i />{symbol && <AssetIcon symbol={symbol} size={17} />}{symbol} Long</span>
+          <span className="panel-market-label"><Localized message={"{0}{1}{2} Long"} values={[<i />, symbol && <AssetIcon symbol={symbol} size={17} />, symbol]} /></span>
           <b>{dollarsFull(now?.oi[market]?.[0] ?? 0)}</b>
         </span>
         <span style={{ color: RED }}>
-          <span className="panel-market-label"><i />{symbol && <AssetIcon symbol={symbol} size={17} />}{symbol} Short</span>
+          <span className="panel-market-label"><Localized message={"{0}{1}{2} Short"} values={[<i />, symbol && <AssetIcon symbol={symbol} size={17} />, symbol]} /></span>
           <b>{dollarsFull(now?.oi[market]?.[1] ?? 0)}</b>
         </span>
       </div>
@@ -395,26 +393,26 @@ export function LiquidationHeatmap({ area }: { area?: string }) {
     <Panel
       area={area}
       chart
-      title="Liquidation map"
+      title={tx("Liquidation map")}
       tools={
         <>
           <span className="seg">{marketSelect}</span>
           <span className="seg">
-            <select aria-label="Price range" value={span} onChange={(e) => setSpan(Number(e.target.value))}>
+            <select aria-label={tx("Price range")} value={span} onChange={(e) => setSpan(Number(e.target.value))}>
               {SPANS.map(([label, value]) => (
                 <option key={label} value={value}>
-                  {label}
+                  {tx(label)}
                 </option>
               ))}
             </select>
           </span>
-          <span className="sub hide-narrow" title="Notional that would be liquidated in the brightest band">
+          <span className="sub hide-narrow" title={tx("Notional that would be liquidated in the brightest band")}>
             $0 <i style={{ display: "inline-block", width: 70, height: 6, verticalAlign: "middle", background: `linear-gradient(90deg, rgba(11,158,107,.15), ${GREEN}, ${BLUE})` }} /> {dollars(peak)}
           </span>
         </>
       }
     >
-      <div className="fill">{price > 0 ? <Heatmap bins={bins} top={top} bottom={bottom} path={path.current} last={price} /> : <div className="plot empty">Waiting for a price.</div>}</div>
+      <div className="fill">{price > 0 ? <Heatmap bins={bins} top={top} bottom={bottom} path={path.current} last={price} /> : <div className="plot empty">{tx("Waiting for a price.")}</div>}</div>
     </Panel>
   );
 }
@@ -427,7 +425,7 @@ export function HousePnl({ area }: { area?: string }) {
   const price = prices[market] ?? 0;
   const points = useMemo(() => (info && price > 0 ? housePnlCurve(positions, market, price, info) : []), [positions, market, price, info]);
   return (
-    <Panel area={area} chart title="Vault PnL on a 1% move" tools={<span className="seg">{marketSelect}</span>}>
+    <Panel area={area} chart title={tx("Vault PnL on a 1% move")} tools={<span className="seg">{marketSelect}</span>}>
       <div className="fill">
         <PnlCurve points={points} range={0.01} priceLabel={price ? `$${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : ""} />
       </div>
@@ -441,7 +439,7 @@ export function PositionTopology({ area }: { area?: string }) {
   const markets = useStore((s) => s.house?.markets);
   const dots = useMemo(() => (markets ? topologyDots(positions, prices, markets) : []), [positions, prices, markets]);
   return (
-    <Panel area={area} chart title="Position map">
+    <Panel area={area} chart title={tx("Position map")}>
       <div className="fill">
         <Topology dots={dots} />
       </div>
@@ -452,29 +450,27 @@ export function PositionTopology({ area }: { area?: string }) {
 export function QueueStats({ area }: { area?: string }) {
   const house = useStore((s) => s.house);
   const stats = house?.queueStats;
-  const none = <span className="dim">None</span>;
+  const none = <span className="dim">{tx("None")}</span>;
   return (
-    <Panel title="Payout queue" area={area}>
+    <Panel title={tx("Payout queue")} area={area}>
       <div className="panel-body">
         <div className="kv">
-          <span title="Winnings owed to traders and not yet paid.">Queued wins</span>
+          <span title={tx("Winnings owed to traders and not yet paid.")}>{tx("Queued wins")}</span>
           <span>{house ? usd(house.house.totalQueued) : "–"}</span>
         </div>
         <div className="kv">
-          <span>Entries in the queue</span>
+          <span>{tx("Entries in the queue")}</span>
           <span>{stats ? stats.entries.toLocaleString("en-US") : "–"}</span>
         </div>
         <div className="kv">
-          <span>Largest entry</span>
+          <span>{tx("Largest entry")}</span>
           <span>{stats && big(stats.largest) > 0n ? usd(stats.largest) : none}</span>
         </div>
         <div className="kv">
-          <span title="The payout at the front of the line: the next one the vault pays.">Paid next</span>
+          <span title={tx("The payout at the front of the line: the next one the vault pays.")}>{tx("Paid next")}</span>
           <span>{stats && big(stats.front) > 0n ? usd(stats.front) : none}</span>
         </div>
-        <p className="note" style={{ marginTop: 12 }}>
-          When the vault cannot pay a win in full, the rest waits here. It is paid strictly in order as losses come in. Your margin is never queued.
-        </p>
+        <p className="note" style={{ marginTop: 12 }}>{tx("When the vault cannot pay a win in full, the rest waits here. It is paid strictly in order as losses come in. Your margin is never queued.")}</p>
       </div>
     </Panel>
   );
@@ -489,7 +485,7 @@ export function QueuePlacement({ area }: { area?: string }) {
   const behind = Math.max(0, total - ahead - mine);
   const caption = !owner ? "Connect a wallet to see your entries" : mine > 0 ? `${dollars(mine)} of it is yours, ${dollars(ahead)} is ahead of you` : "None of it is yours";
   return (
-    <Panel area={area} chart title="Queue placement">
+    <Panel area={area} chart title={tx("Queue placement")}>
       <div className="fill">
         <QueueRing ahead={ahead} mine={mine} behind={behind} caption={caption} />
       </div>
@@ -507,7 +503,7 @@ export function QueueDebt({ area }: { area?: string }) {
       chart
       title={
         <>
-          Queued wins <span style={{ fontWeight: 500, marginLeft: 8 }}>{usdCompact(queued)}</span>
+          {tx(" Queued wins ")}<span style={{ fontWeight: 500, marginLeft: 8 }}>{usdCompact(queued)}</span>
         </>
       }
       tools={<span className="seg">{range}</span>}
@@ -539,19 +535,19 @@ export function StakingRevenue({ area }: { area?: string }) {
     <Panel
       area={area}
       chart
-      title="Staking revenue"
+      title={tx("Staking revenue")}
       tools={
         <span className="seg">
-          <select aria-label="Bar width" value={bucket} onChange={(e) => setBucket(Number(e.target.value))}>
+          <select aria-label={tx("Bar width")} value={bucket} onChange={(e) => setBucket(Number(e.target.value))}>
             <option value={600}>10m</option>
             <option value={3_600}>1h</option>
             <option value={14_400}>4h</option>
           </select>
-          <span className="live">Live</span>
+          <span className="live">{tx("Live")}</span>
         </span>
       }
     >
-      <div className="fill">{bars.length ? <Bars bars={bars} /> : <div className="plot empty">No rewards have been paid in this window yet.</div>}</div>
+      <div className="fill">{bars.length ? <Bars bars={bars} /> : <div className="plot empty">{tx("No rewards have been paid in this window yet.")}</div>}</div>
     </Panel>
   );
 }
@@ -559,16 +555,14 @@ export function StakingRevenue({ area }: { area?: string }) {
 export function RewardCurvePanel({ area }: { area?: string }) {
   const coin = useStore((s) => s.coin);
   return (
-    <Panel area={area} chart title={`${coin?.symbol ?? "Coin"} reward curve`} sub={`${coin?.symbol ?? "Coin"} paid per $1 of realised loss`}>
+    <Panel area={area} chart title={tx("{0} reward curve", [coin?.symbol ?? "Coin"])} sub={tx("{0} paid per $1 of realised loss", [coin?.symbol ?? "Coin"])}>
       <div className="fill">
-        {coin?.attached && (
-          <RewardCurve
+        {coin?.attached && (<RewardCurve
             perDollar={Number(big(coin.mining.perDollar)) / 1e18}
             lossNow={usdNumber(coin.mining.cumulativeLossUsd)}
             scale={usdNumber(coin.mining.scaleUsd)}
             symbol={coin.symbol}
-          />
-        )}
+          />)}
       </div>
     </Panel>
   );
@@ -579,16 +573,10 @@ export function CoinSupply({ area }: { area?: string }) {
   const symbol = useStore((s) => s.coin?.symbol) ?? "Coin";
   const lines = useMemo(() => [line("Mined", INK, window, (p) => p.mined), line("Staked", "#f7931a", window, (p) => p.staked)], [window]);
   return (
-    <Panel area={area} chart title={`${symbol} mined and staked`} tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("{0} mined and staked", [symbol])} tools={<span className="seg">{range}</span>}>
       <div className="legend">
-        <span style={{ color: INK }}>
-          <i />
-          Mined
-        </span>
-        <span style={{ color: "#f7931a" }}>
-          <i />
-          Staked
-        </span>
+        <span style={{ color: INK }}><Localized message={"{0}Mined"} values={[<i />]} /></span>
+        <span style={{ color: "#f7931a" }}><Localized message={"{0}Staked"} values={[<i />]} /></span>
       </div>
       <div className="fill">
         <Lines lines={lines} format={compact} />
@@ -601,7 +589,7 @@ export function StakingRewards({ area }: { area?: string }) {
   const [window, range] = useRange();
   const lines = useMemo(() => [line("Staking rewards", GREEN, window, (p) => p.paid, true)], [window]);
   return (
-    <Panel area={area} chart title="Total staking rewards" tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("Total staking rewards")} tools={<span className="seg">{range}</span>}>
       <div className="fill">
         <Lines lines={lines} />
       </div>
@@ -617,12 +605,7 @@ function MarketLegend({ total = false }: { total?: boolean }) {
   const markets = useStore((s) => s.config?.markets) ?? [];
   return (
     <div className="legend">
-      {total && (
-        <span style={{ color: GREY }}>
-          <i />
-          Total
-        </span>
-      )}
+      {total && (<span style={{ color: GREY }}><Localized message={"{0}Total"} values={[<i />]} /></span>)}
       {markets.map((m) => (
         <span key={m.id} className="panel-market-label" style={{ color: MARKET_COLORS[m.id % MARKET_COLORS.length] }}>
           <i />
@@ -642,7 +625,7 @@ export function OpenInterest({ area }: { area?: string }) {
     [window, markets],
   );
   return (
-    <Panel area={area} chart title="Open interest" tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("Open interest")} tools={<span className="seg">{range}</span>}>
       <MarketLegend />
       <div className="fill">
         <Lines lines={lines} />
@@ -659,7 +642,7 @@ export function TotalVolume({ area }: { area?: string }) {
     [window, markets],
   );
   return (
-    <Panel area={area} chart title="Total volume" tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("Total volume")} tools={<span className="seg">{range}</span>}>
       <MarketLegend total />
       <div className="fill">
         <Lines lines={lines} />
@@ -673,7 +656,7 @@ export function TraderPnl({ area }: { area?: string }) {
   const down = (last(window)?.pnl ?? 0) < 0;
   const lines = useMemo(() => [line("Traders", down ? RED : GREEN, window, (p) => p.pnl, true)], [window, down]);
   return (
-    <Panel area={area} chart title="Total trader PnL" tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("Total trader PnL")} tools={<span className="seg">{range}</span>}>
       <div className="fill">
         <Lines lines={lines} />
       </div>
@@ -685,7 +668,7 @@ export function Tvl({ area }: { area?: string }) {
   const [window, range] = useRange();
   const lines = useMemo(() => [line("TVL", BLUE, window, (p) => p.tvl, true)], [window]);
   return (
-    <Panel area={area} chart title="TVL" tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("TVL")} tools={<span className="seg">{range}</span>}>
       <div className="fill">
         <Lines lines={lines} />
       </div>
@@ -697,7 +680,7 @@ export function TotalUsers({ area }: { area?: string }) {
   const [window, range] = useRange();
   const lines = useMemo(() => [line("Users", BLUE, window, (p) => p.users, true)], [window]);
   return (
-    <Panel area={area} chart title="Total users" tools={<span className="seg">{range}</span>}>
+    <Panel area={area} chart title={tx("Total users")} tools={<span className="seg">{range}</span>}>
       <div className="fill">
         <Lines lines={lines} format={compact} />
       </div>
@@ -721,11 +704,10 @@ export function StatTiles() {
     <div className="cells tiles">
       {tiles.map(([label, value]) => (
         <div className="tile" key={label}>
-          <span className="title">{label}</span>
+          <span className="title">{tx(label)}</span>
           <b>{value}</b>
         </div>
       ))}
     </div>
   );
 }
-

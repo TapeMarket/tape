@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { useEffect, useState, type ReactNode } from "react";
 import { Hero } from "../components/Hero";
 import { SeasonBoard } from "../components/Season";
@@ -86,10 +87,10 @@ export function Leaderboard() {
               meta={
                 <>
                   <span>
-                    {market?.symbol} {t.leverage}x {t.isLong ? "long" : "short"}
+                    {market?.symbol} {t.leverage}x {t.isLong ? tx("long") : tx("short")}
                   </span>
                   <span>{margin > 0n ? percent(usdNumber(t.pnl) / usdNumber(margin), 1, true) : "–"}</span>
-                  <span>{t.entryTime ? `held ${duration(t.time - t.entryTime)}` : ""}</span>
+                  <span>{t.entryTime ? tx("held {0}", [duration(t.time - t.entryTime)]) : ""}</span>
                 </>
               }
             />
@@ -104,9 +105,9 @@ export function Leaderboard() {
             me={isMe(row.address)}
             meta={
               <>
-                <span>{usd(row.volume, { cents: false })} traded</span>
-                <span>{row.trades ? `${percent(row.wins / row.trades, 0)} won` : ""}</span>
-                <span>{row.busts} liquidations</span>
+                <span><Localized message={"{0} traded"} values={[usd(row.volume, { cents: false })]} /></span>
+                <span>{row.trades ? tx("{0} won", [percent(row.wins / row.trades, 0)]) : ""}</span>
+                <span><Localized message={"{0} liquidations"} values={[row.busts]} /></span>
               </>
             }
           />
@@ -115,17 +116,17 @@ export function Leaderboard() {
   return (
     <div className="sheet work-page leaderboard-page">
       <Hero
-        title="Leaderboard"
-        lede={view === "positions" ? "The biggest winning trades in the period." : "Traders ranked by profit in the period."}
+        title={tx("Leaderboard")}
+        lede={view === "positions" ? tx("The biggest winning trades in the period.") : tx("Traders ranked by profit in the period.")}
         actions={
           <>
             {owner ? (
               <button className="btn" onClick={() => setState({ dialog: "username" })}>
-                {myName ? `You are ${myName}` : "Claim a username"}
+                {myName ? tx("You are {0}", [myName]) : tx("Claim a username")}
               </button>
             ) : (
               <button className="btn primary" onClick={() => setState({ dialog: "connect" })}>
-                {PREVIEW ? "Start trading" : "Connect wallet"}
+                {PREVIEW ? tx("Start trading") : tx("Connect wallet")}
               </button>
             )}
           </>
@@ -133,22 +134,18 @@ export function Leaderboard() {
       />
 
       <div className="page-toolbar leaderboard-toolbar">
-            <span className="seg" role="group" aria-label="Leaderboard">
-              <button aria-pressed={view === "positions"} onClick={() => setView("positions")}>
-                Trades
-              </button>
-              <button aria-pressed={view === "accounts"} onClick={() => setView("accounts")}>
-                Traders
-              </button>
+            <span className="seg" role="group" aria-label={tx("Leaderboard")}>
+              <button aria-pressed={view === "positions"} onClick={() => setView("positions")}>{tx("Trades")}</button>
+              <button aria-pressed={view === "accounts"} onClick={() => setView("accounts")}>{tx("Traders")}</button>
             </span>
-            <span className="seg" role="group" aria-label="Period">
+            <span className="seg" role="group" aria-label={tx("Period")}>
               {WINDOWS.map(([id, label]) => (
                 <button key={id} aria-pressed={window === id} onClick={() => setWindow(id)}>
-                  {label}
+                  {tx(label)}
                 </button>
               ))}
             </span>
-            <input className="input left lb-search" placeholder="Search name or address" aria-label="Search name or address" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="input left lb-search" placeholder={tx("Search name or address")} aria-label={tx("Search name or address")} value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <SeasonBoard />
@@ -157,24 +154,23 @@ export function Leaderboard() {
 
       <section className="panel lb-card">
         <div className="panel-head">
-          <h2 className="title">{view === "positions" ? "All winning trades" : "All traders"}</h2>
+          <h2 className="title">{view === "positions" ? tx("All winning trades") : tx("All traders")}</h2>
           <span className="soft">{board ? `${count}${needle ? ` of ${total}` : ""} ${view === "positions" ? "trades" : "traders"}` : ""}</span>
         </div>
-        {error && <div className="page-feedback" role="alert"><span>Couldn’t refresh the {window === "all" ? "all-time" : window} board.{board ? " Showing the last available results." : " Try again to load results."}</span><button className="btn small" onClick={() => setRetry((n) => n + 1)}>Retry</button></div>}
+        {error && <div className="page-feedback" role="alert"><span><Localized message={"Couldn’t refresh the {0} board.{1}"} values={[window === "all" ? tx("all-time") : window, board ? tx(" Showing the last available results.") : tx(" Try again to load results.")]} /></span><button className="btn small" onClick={() => setRetry((n) => n + 1)}>{tx("Retry")}</button></div>}
         <div className="lb-wrap" hidden={!board || total === 0 || count === 0}>
-          {view === "positions" ? (
-            <div className="lb">
+          {view === "positions" ? (<div className="lb">
               <div className="lb-cols">
                 <span>#</span>
-                <span>Trader</span>
-                <span>Trade</span>
-                <span className="r">Size</span>
-                <span className="r">Entry → exit</span>
-                <span className="r">Profit</span>
+                <span>{tx("Trader")}</span>
+                <span>{tx("Trade")}</span>
+                <span className="r">{tx("Size")}</span>
+                <span className="r">{tx("Entry → exit")}</span>
+                <span className="r">{tx("Profit")}</span>
                 <span className="r">%</span>
-                <span className="r">Margin</span>
-                <span className="r">Held</span>
-                <span className="r">Closed</span>
+                <span className="r">{tx("Margin")}</span>
+                <span className="r">{tx("Held")}</span>
+                <span className="r">{tx("Closed")}</span>
               </div>
               {positions.map(({ t, rank }) => {
                 const market = markets[t.market];
@@ -187,7 +183,7 @@ export function Leaderboard() {
                       <AssetIcon symbol={market?.symbol ?? "BTC"} />
                       {market?.symbol}
                       <span className={`side ${t.isLong ? "up" : "down"}`}>
-                        {t.leverage}x {t.isLong ? "Long" : "Short"}
+                        {t.leverage}x {t.isLong ? tx("Long") : tx("Short")}
                       </span>
                     </span>
                     <span className="r">{t.leverage ? usd(margin * BigInt(t.leverage), { cents: false }) : "–"}</span>
@@ -198,21 +194,19 @@ export function Leaderboard() {
                     <span className="r up">{margin > 0n ? percent(usdNumber(t.pnl) / usdNumber(margin), 1, true) : "–"}</span>
                     <span className="r">{usd(margin).slice(1)}</span>
                     <span className="r">{t.entryTime ? duration(t.time - t.entryTime) : "–"}</span>
-                    <span className="r soft">{ago(t.time, now)} ago</span>
+                    <span className="r soft"><Localized message={"{0} ago"} values={[ago(t.time, now)]} /></span>
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div className="lb lb-accounts">
+            </div>) : (<div className="lb lb-accounts">
               <div className="lb-cols">
                 <span>#</span>
-                <span>Trader</span>
-                <span className="r">Profit</span>
-                <span className="r">Volume</span>
-                <span className="r">Trades</span>
-                <span className="r">Win rate</span>
-                <span className="r">Liquidations</span>
+                <span>{tx("Trader")}</span>
+                <span className="r">{tx("Profit")}</span>
+                <span className="r">{tx("Volume")}</span>
+                <span className="r">{tx("Trades")}</span>
+                <span className="r">{tx("Win rate")}</span>
+                <span className="r">{tx("Liquidations")}</span>
               </div>
               {accounts.map(({ row, rank }) => {
                 const pnl = big(row.pnl);
@@ -228,14 +222,13 @@ export function Leaderboard() {
                   </div>
                 );
               })}
-            </div>
-          )}
+            </div>)}
         </div>
-        {!board && !error && <div className="quiet-empty" role="status"><p>Loading the board…</p><span>Finding the results for this period.</span></div>}
+        {!board && !error && <div className="quiet-empty" role="status"><p>{tx("Loading the board…")}</p><span>{tx("Finding the results for this period.")}</span></div>}
         {board && count === 0 && <div className="quiet-empty">
-          <p>{needle ? "No traders match your search." : "First place is still open."}</p>
-          <span>{needle ? "Try a different name or wallet address." : view === "positions" ? "Winning trades in this period will appear here." : "Traders appear after their first closed trade in this period."}</span>
-          {needle ? <button className="btn" onClick={() => setSearch("")}>Clear search</button> : <Link to="/trade" className="btn">Go to exchange</Link>}
+          <p>{needle ? tx("No traders match your search.") : tx("First place is still open.")}</p>
+          <span>{needle ? tx("Try a different name or wallet address.") : view === "positions" ? tx("Winning trades in this period will appear here.") : tx("Traders appear after their first closed trade in this period.")}</span>
+          {needle ? <button className="btn" onClick={() => setSearch("")}>{tx("Clear search")}</button> : <Link to="/trade" className="btn">{tx("Go to exchange")}</Link>}
         </div>}
       </section>
     </div>

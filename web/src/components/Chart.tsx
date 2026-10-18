@@ -1,3 +1,4 @@
+import { tx, useLocale } from "../lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ColorType, CrosshairMode, LastPriceAnimationMode, LineStyle, LineType, createChart, type IChartApi, type IPriceLine, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { bustPrice } from "@shared/math.mjs";
@@ -62,6 +63,7 @@ export const localTime = (unixSeconds: number): UTCTimestamp => (unixSeconds - n
 const CANDLES_FROM = 60;
 
 export function Chart({ marketId, interval = 0 }: { marketId: number; interval?: number }) {
+  const locale = useLocale();
   const holder = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | ISeriesApi<"Candlestick"> | null>(null);
@@ -461,7 +463,7 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
           lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: `${p.isLong ? "long" : "short"} ${p.leverage}x`,
+          title: `${tx(p.isLong ? "long" : "short")} ${p.leverage}x`,
         }),
         series.createPriceLine({
           price: priceNumber(p.bust),
@@ -469,7 +471,7 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
           lineWidth: 1,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: "liq.",
+          title: tx("liq."),
         }),
       );
       for (const [at, title, color] of [
@@ -489,7 +491,7 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
         );
       }
     }
-  }, [positions, marketId]);
+  }, [positions, marketId, locale]);
 
   // The ticket's preview: where a position opened right now would bust. It follows the mark, so
   // the one line is moved on each tick rather than rebuilt.
@@ -503,7 +505,7 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
     zonesRef.current = zonesFor(positions, marketId, preview);
 
     const shown = zonesRef.current.find((zone) => !zone.live) ?? null;
-    if (shown && previewRef.current) previewRef.current.applyOptions({ price: shown.price });
+    if (shown && previewRef.current) previewRef.current.applyOptions({ price: shown.price, title: tx("liq. if opened now") });
     else if (shown) {
       previewRef.current = series.createPriceLine({
         price: shown.price,
@@ -511,21 +513,21 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
         lineWidth: 1,
         lineStyle: LineStyle.Dotted,
         axisLabelVisible: true,
-        title: "liq. if opened now",
+        title: tx("liq. if opened now"),
       });
     } else if (previewRef.current) {
       series.removePriceLine(previewRef.current);
       previewRef.current = null;
     }
     scheduleLayout();
-  }, [positions, marketId, ticket, tick, market]);
+  }, [positions, marketId, ticket, tick, market, locale]);
 
   return (
     <div className="chart">
       <div className="chart-canvas" ref={holder} />
       <button
         className="chip chart-reset"
-        title="Back to the live price at the normal zoom"
+        title={tx("Back to the live price at the normal zoom")}
         onClick={() => {
           const chart = chartRef.current;
           if (!chart) return;
@@ -536,14 +538,12 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
           }
           chart.priceScale("right").applyOptions({ autoScale: true });
         }}
-      >
-        Reset
-      </button>
+      >{tx("Reset")}</button>
       {boxes.map((box, i) => (
         <div
           key={i}
           className={`bust-zone ${box.below ? "below" : "above"} ${box.live ? "" : "preview"}`}
-          data-label={box.live ? "Liquidation" : ""}
+          data-label={box.live ? tx("Liquidation") : ""}
           style={{ top: box.top, height: box.height }}
         />
       ))}

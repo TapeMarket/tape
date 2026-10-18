@@ -1,3 +1,4 @@
+import { tx } from "../lib/i18n";
 import type { ReactNode } from "react";
 
 export interface Figure {
@@ -15,20 +16,18 @@ export function Hero({ title, lede, actions, figures }: { title: ReactNode; lede
   return (
     <header className="hero">
       <div className="hero-copy">
-        <h1>{title}</h1>
-        {lede && <p>{lede}</p>}
+        <h1>{tx(title)}</h1>
+        {lede && <p>{tx(lede)}</p>}
       </div>
       {actions && <div className="hero-actions">{actions}</div>}
-      {figures && figures.length > 0 && (
-        <dl className="hero-figs">
+      {figures && figures.length > 0 && (<dl className="hero-figs">
           {figures.map((f) => (
-            <div key={f.label} title={f.hint}>
-              <dt>{f.label}</dt>
+            <div key={tx(f.label)} title={tx(f.hint)}>
+              <dt>{tx(f.label)}</dt>
               <dd className={f.tone ?? ""}>{f.value}</dd>
             </div>
           ))}
-        </dl>
-      )}
+        </dl>)}
     </header>
   );
 }

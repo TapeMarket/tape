@@ -1,6 +1,4 @@
-// Every chart that is not the price chart: the time series (drawn with lightweight-charts) and a
-// handful of small SVG plots sized to whatever panel they are put in.
-
+import { tx } from "../lib/i18n";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ColorType, CrosshairMode, LineStyle, createChart, type IChartApi, type ISeriesApi } from "lightweight-charts";
 import { localTime } from "./Chart";
@@ -88,11 +86,7 @@ export function Lines({ lines, format = dollars, labelColor = "#4b5675", labelSi
   return (
     <div className="plot">
       <div className="plot" ref={holder} />
-      {empty && (
-        <div className="plot empty" style={{ pointerEvents: "none" }}>
-          Collecting data. This fills in as the exchange runs.
-        </div>
-      )}
+      {empty && (<div className="plot empty" style={{ pointerEvents: "none" }}>{tx("Collecting data. This fills in as the exchange runs.")}</div>)}
     </div>
   );
 }
@@ -119,11 +113,9 @@ export function Plot({ label, children }: { label: string; children: (w: number,
   const [ref, { w, h }] = useSize<HTMLDivElement>();
   return (
     <div className="plot" ref={ref}>
-      {w > 40 && h > 40 && (
-        <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label}>
+      {w > 40 && h > 40 && (<svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={tx(label)}>
           {children(w, h)}
-        </svg>
-      )}
+        </svg>)}
     </div>
   );
 }
@@ -138,7 +130,7 @@ function niceCeil(value: number): number {
 
 export function Bars({ bars, format = dollars }: { bars: { t: number; v: number }[]; format?: (value: number) => string }) {
   return (
-    <Plot label="Bar chart">
+    <Plot label={tx("Bar chart")}>
       {(w, h) => {
         const right = 60;
         const bottom = 22;
@@ -179,7 +171,7 @@ export function Bars({ bars, format = dollars }: { bars: { t: number; v: number 
 /** Coin paid per dollar lost, against everything lost so far. Only ever falls. */
 export function RewardCurve({ perDollar, lossNow, scale, symbol }: { perDollar: number; lossNow: number; scale: number; symbol: string }) {
   return (
-    <Plot label="Reward curve">
+    <Plot label={tx("Reward curve")}>
       {(w, h) => {
         const left = 44;
         const right = 16;
@@ -215,16 +207,14 @@ export function RewardCurve({ perDollar, lossNow, scale, symbol }: { perDollar: 
             <path d={path} fill="none" stroke={BLUE} strokeWidth={2} />
             <line x1={x(scale)} x2={x(scale)} y1={top} y2={y(0)} stroke={GREY} strokeDasharray="3 4" />
             <text x={x(scale) + 6} y={top + 10} style={{ fill: GREY, fontWeight: 600 }}>
-              Half mined at {dollars(scale)}
+              {tx(" Half mined at ")}{dollars(scale)}
             </text>
             <line x1={x(lossNow)} x2={x(lossNow)} y1={top} y2={y(0)} stroke={GREEN} strokeDasharray="2 3" />
             <circle cx={x(lossNow)} cy={y(perDollar)} r={4} fill={GREEN} />
             <text x={tagX} y={y(perDollar) - 9} style={{ fill: GREEN, fontWeight: 600, fontSize: 11 }}>
-              {perDollar.toFixed(perDollar >= 20 ? 1 : 2)} {symbol} / $1 · {dollars(lossNow)} lost so far
-            </text>
+              {perDollar.toFixed(perDollar >= 20 ? 1 : 2)} {symbol} / $1 · {dollars(lossNow)} {tx(" lost so far ")}</text>
             <text x={left} y={12} style={{ fill: BLUE, fontWeight: 600 }}>
-              {symbol} per $1 lost
-            </text>
+              {symbol} {tx(" per $1 lost ")}</text>
           </>
         );
       }}
@@ -235,7 +225,7 @@ export function RewardCurve({ perDollar, lossNow, scale, symbol }: { perDollar: 
 /** What the house makes or loses if the price moves, from -range to +range. */
 export function PnlCurve({ points, range, priceLabel }: { points: { x: number; v: number }[]; range: number; priceLabel: string }) {
   return (
-    <Plot label="Vault profit and loss by price move">
+    <Plot label={tx("Vault profit and loss by price move")}>
       {(w, h) => {
         if (points.length < 2) return null;
         const top = 26;
@@ -262,7 +252,7 @@ export function PnlCurve({ points, range, priceLabel }: { points: { x: number; v
               {dollars(lo)}
             </text>
             <text x={x(0) + 7} y={14} style={{ fill: now.v >= 0 ? GREEN : RED, fontWeight: 600 }}>
-              now {now.v > 0 ? "+" : ""}
+              {tx(" now ")}{now.v > 0 ? "+" : ""}
               {dollars(now.v)}
             </text>
             <text x={0} y={h - 6}>
@@ -287,7 +277,7 @@ export function PnlCurve({ points, range, priceLabel }: { points: { x: number; v
  */
 export function Heatmap({ bins, top, bottom, path, last }: { bins: number[]; top: number; bottom: number; path: { t: number; p: number }[]; last: number }) {
   return (
-    <Plot label="Liquidation map">
+    <Plot label={tx("Liquidation map")}>
       {(w, h) => {
         const right = 66;
         const foot = 20;
@@ -353,7 +343,7 @@ export function Heatmap({ bins, top, bottom, path, last }: { bins: number[]; top
  */
 export function Topology({ dots }: { dots: { x: number; y: number; r: number }[] }) {
   return (
-    <Plot label="Position map">
+    <Plot label={tx("Position map")}>
       {(w, h) => {
         const pad = 22;
         const cx = w / 2;
@@ -380,17 +370,13 @@ export function Topology({ dots }: { dots: { x: number; y: number; r: number }[]
               <circle key={i} cx={cx + dot.x * sx} cy={cy - dot.y * sy} r={dot.r} fill={dot.y >= 0 ? fade(GREEN, 0.34) : fade(RED, 0.34)} />
             ))}
             <text x={pad} y={cy - 6} style={{ fontWeight: 600 }}>
-              Short 1000x
-            </text>
+              {tx(" Short 1000x ")}</text>
             <text x={w - pad} y={cy - 6} textAnchor="end" style={{ fontWeight: 600 }}>
-              Long 1000x
-            </text>
+              {tx(" Long 1000x ")}</text>
             <text x={cx + 8} y={pad - 6} style={{ fontWeight: 600 }}>
-              Vault up
-            </text>
+              {tx(" Vault up ")}</text>
             <text x={cx + 8} y={h - pad + 14} style={{ fontWeight: 600 }}>
-              Vault down
-            </text>
+              {tx(" Vault down ")}</text>
           </>
         );
       }}
@@ -401,7 +387,7 @@ export function Topology({ dots }: { dots: { x: number; y: number; r: number }[]
 /** The queue as a ring: what is ahead of you, yours, and what is behind. */
 export function QueueRing({ ahead, mine, behind, caption }: { ahead: number; mine: number; behind: number; caption: string }) {
   return (
-    <Plot label="Queue placement">
+    <Plot label={tx("Queue placement")}>
       {(w, h) => {
         const size = Math.min(w, h - 26);
         const r = size / 2 - 22;
@@ -442,7 +428,7 @@ export function QueueRing({ ahead, mine, behind, caption }: { ahead: number; min
             {arc(mine, BLUE)}
             {arc(behind, "#cdd4e3")}
             <text x={cx} y={cy + 4} textAnchor="middle" style={{ fill: total > 0 ? INK : GREY, fontSize: 12, fontWeight: 600 }}>
-              {total > 0 ? dollars(total) : "Queue empty"}
+              {total > 0 ? dollars(total) : tx("Queue empty")}
             </text>
             <text x={cx} y={h - 8} textAnchor="middle">
               {caption}

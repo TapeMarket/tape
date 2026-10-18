@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { useState } from "react";
 import { BPS, FEE_BPS, REFERENCE_NOTIONAL, bustPrice, keepShare, settle } from "@shared/math.mjs";
 import { big, usd } from "../lib/format";
@@ -35,30 +36,30 @@ export function DocsExample({ markets }: { markets: Market[] }) {
   const levels = [...new Set([1, 10, 100, 500, 1000, market.maxLeverage])].filter(value => value <= market.maxLeverage).sort((a, b) => a - b);
 
   return <div className="docs-example">
-    <header><h3>Try a winning close</h3><p>A long position with $100 of cash margin. Change the inputs to see what reaches your balance.</p></header>
+    <header><h3>{tx("Try a winning close")}</h3><p>{tx("A long position with $100 of cash margin. Change the inputs to see what reaches your balance.")}</p></header>
     <div className="docs-example-controls">
-      <label>Market<select aria-label="Market" value={market.id} onChange={event => setMarketId(Number(event.target.value))}>{markets.map(item => <option key={item.id} value={item.id}>{item.symbol}</option>)}</select></label>
-      <label>Leverage<select aria-label="Leverage" value={lev} onChange={event => setLeverage(Number(event.target.value))}>{levels.map(value => <option key={value} value={value}>{value}x</option>)}</select></label>
-      <label>Price increase<select aria-label="Price increase" value={move} onChange={event => setMove(Number(event.target.value))}>{[1, 2, 5, 10, 25, 50, 100].map(value => <option key={value} value={value}>{percent(value)}</option>)}</select></label>
-      <label>Size Impact<select aria-label="Size Impact" value={impact} onChange={event => setImpact(Number(event.target.value))}>{[1, 2, 5, 10, 20].map(value => <option key={value} value={value}>{value}x</option>)}</select></label>
+      <label>{tx("Market")}<select aria-label={tx("Market")} value={market.id} onChange={event => setMarketId(Number(event.target.value))}>{markets.map(item => <option key={item.id} value={item.id}>{item.symbol}</option>)}</select></label>
+      <label>{tx("Leverage")}<select aria-label={tx("Leverage")} value={lev} onChange={event => setLeverage(Number(event.target.value))}>{levels.map(value => <option key={value} value={value}>{value}x</option>)}</select></label>
+      <label>{tx("Price increase")}<select aria-label={tx("Price increase")} value={move} onChange={event => setMove(Number(event.target.value))}>{[1, 2, 5, 10, 25, 50, 100].map(value => <option key={value} value={value}>{percent(value)}</option>)}</select></label>
+      <label>{tx("Size Impact")}<select aria-label={tx("Size Impact")} value={impact} onChange={event => setImpact(Number(event.target.value))}>{[1, 2, 5, 10, 20].map(value => <option key={value} value={value}>{value}x</option>)}</select></label>
     </div>
     <dl className="docs-example-position">
-      <div><dt>Example entry</dt><dd>{price(entry)}</dd></div>
-      <div><dt>Position size</dt><dd>{usd(notional)}</dd></div>
-      <div><dt>Long liquidates at</dt><dd>{price(bust)} <small>−{liquidationMove.toFixed(4)}%</small></dd></div>
+      <div><dt>{tx("Example entry")}</dt><dd>{price(entry)}</dd></div>
+      <div><dt>{tx("Position size")}</dt><dd>{usd(notional)}</dd></div>
+      <div><dt>{tx("Long liquidates at")}</dt><dd>{price(bust)} <small>−{liquidationMove.toFixed(4)}%</small></dd></div>
     </dl>
     <dl className="docs-receipt">
-      <div><dt>Raw price gain</dt><dd>{usd(raw)}</dd></div>
-      <div><dt>Deadband</dt><dd>{usd(-(raw - afterDeadband))}</dd></div>
-      <div><dt>Impact haircut</dt><dd>{usd(-(afterDeadband - afterImpact))}</dd></div>
-      <div><dt>Win fee · {Number(FEE_BPS) / 100}%</dt><dd>{usd(-fee)}</dd></div>
-      <div className="docs-receipt-total"><dt>Net profit</dt><dd><output aria-live="polite" aria-label="Example net profit">{usd(net)}</output></dd></div>
+      <div><dt>{tx("Raw price gain")}</dt><dd>{usd(raw)}</dd></div>
+      <div><dt>{tx("Deadband")}</dt><dd>{usd(-(raw - afterDeadband))}</dd></div>
+      <div><dt>{tx("Impact haircut")}</dt><dd>{usd(-(afterDeadband - afterImpact))}</dd></div>
+      <div><dt><Localized message={"Win fee · {0}%"} values={[Number(FEE_BPS) / 100]} /></dt><dd>{usd(-fee)}</dd></div>
+      <div className="docs-receipt-total"><dt>{tx("Net profit")}</dt><dd><output aria-live="polite" aria-label={tx("Example net profit")}>{usd(net)}</output></dd></div>
     </dl>
-    <p className="docs-example-note">Your $100 cash margin is returned separately. Profit can enter the payout queue if the vault cannot pay it yet.</p>
+    <p className="docs-example-note">{tx("Your $100 cash margin is returned separately. Profit can enter the payout queue if the vault cannot pay it yet.")}</p>
     <details className="docs-details">
-      <summary>Compare price moves on {market.symbol}</summary>
-      <div className="docs-table-scroll" tabIndex={0} role="region" aria-label="Profit retained at different price moves">
-        <table><caption>Approximate share of the raw gain paid after deductions, at {impact}x Size Impact.</caption><thead><tr><th>Price increase</th><th>Raw gain retained</th></tr></thead><tbody>
+      <summary><Localized message={"Compare price moves on {0}"} values={[market.symbol]} /></summary>
+      <div className="docs-table-scroll" tabIndex={0} role="region" aria-label={tx("Profit retained at different price moves")}>
+        <table><caption><Localized message={"Approximate share of the raw gain paid after deductions, at {0}x Size Impact."} values={[impact]} /></caption><thead><tr><th>{tx("Price increase")}</th><th>{tx("Raw gain retained")}</th></tr></thead><tbody>
           {[1, 2, 5, 10, 25, 50, 100].map(value => <tr key={value}><td>{percent(value)}</td><td>{(keepShare(value, market, REFERENCE_NOTIONAL * BigInt(impact)) * 100).toFixed(1)}%</td></tr>)}
         </tbody></table>
       </div>

@@ -1,3 +1,4 @@
+import { tx, Localized } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { quoteClose } from "@shared/math.mjs";
@@ -40,17 +41,17 @@ export interface TriggerCheck {
 export function checkTriggers(tpText: string, slText: string, shape: Shape, mark: bigint | null): TriggerCheck {
   const takeProfit = tpText.trim() ? parsePrice(tpText) : null;
   const stopLoss = slText.trim() ? parsePrice(slText) : null;
-  if (tpText.trim() && takeProfit === null) return { takeProfit, stopLoss, error: "The take-profit is not a price." };
-  if (slText.trim() && stopLoss === null) return { takeProfit, stopLoss, error: "The stop-loss is not a price." };
+  if (tpText.trim() && takeProfit === null) return { takeProfit, stopLoss, error: tx("The take-profit is not a price.") };
+  if (slText.trim() && stopLoss === null) return { takeProfit, stopLoss, error: tx("The stop-loss is not a price.") };
   const up = shape.isLong;
   if (takeProfit !== null && mark !== null && (up ? takeProfit <= mark : takeProfit >= mark)) {
-    return { takeProfit, stopLoss, error: `A take-profit goes ${up ? "above" : "below"} the price.` };
+    return { takeProfit, stopLoss, error: tx("A take-profit goes {0} the price.", [up ? tx("above") : tx("below")]) };
   }
   if (stopLoss !== null && mark !== null && (up ? stopLoss >= mark : stopLoss <= mark)) {
-    return { takeProfit, stopLoss, error: `A stop-loss goes ${up ? "below" : "above"} the price.` };
+    return { takeProfit, stopLoss, error: tx("A stop-loss goes {0} the price.", [up ? tx("below") : tx("above")]) };
   }
   if (stopLoss !== null && shape.bust !== null && (up ? stopLoss < shape.bust : stopLoss > shape.bust)) {
-    return { takeProfit, stopLoss, error: "That stop is past the liquidation price, which comes first." };
+    return { takeProfit, stopLoss, error: tx("That stop is past the liquidation price, which comes first.") };
   }
   return { takeProfit, stopLoss, error: null };
 }
@@ -86,13 +87,13 @@ export function TriggerFields({
   return (
     <div className="triggers">
       <label className="trigger">
-        <span>Take profit</span>
-        <input className="input" inputMode="decimal" placeholder="Price" value={tp} onChange={(e) => setTp(e.target.value)} aria-label="Take-profit price" disabled={disabled} />
+        <span>{tx("Take profit")}</span>
+        <input className="input" inputMode="decimal" placeholder={tx("Price")} value={tp} onChange={(e) => setTp(e.target.value)} aria-label={tx("Take-profit price")} disabled={disabled} />
         <small className={win && win.pnl > 0n ? "up" : "dim"}>{win ? usd(win.pnl, { sign: true }) : "–"}</small>
       </label>
       <label className="trigger">
-        <span>Stop loss</span>
-        <input className="input" inputMode="decimal" placeholder="Price" value={sl} onChange={(e) => setSl(e.target.value)} aria-label="Stop-loss price" disabled={disabled} />
+        <span>{tx("Stop loss")}</span>
+        <input className="input" inputMode="decimal" placeholder={tx("Price")} value={sl} onChange={(e) => setSl(e.target.value)} aria-label={tx("Stop-loss price")} disabled={disabled} />
         <small className={loss && loss.pnl < 0n ? "down" : "dim"}>{loss ? usd(loss.pnl, { sign: true }) : "–"}</small>
       </label>
       {check.error && <p className="trigger-error">{check.error}</p>}
@@ -107,9 +108,9 @@ export function TriggerEditor({ position, market, mark }: { position: Position; 
   const label =
     tp || sl ? (
       <>
-        {tp && <span className="up">TP {price(tp)}</span>}
+        {tp && <span className="up"><Localized message={"TP {0}"} values={[price(tp)]} /></span>}
         {tp && sl && " · "}
-        {sl && <span className="down">SL {price(sl)}</span>}
+        {sl && <span className="down"><Localized message={"SL {0}"} values={[price(sl)]} /></span>}
       </>
     ) : (
       "TP / SL"
@@ -154,10 +155,10 @@ export function TriggerEditor({ position, market, mark }: { position: Position; 
   return (
     <>
       <button ref={button} className="trigger-pop" aria-expanded={at !== null} aria-haspopup="dialog" onClick={toggle}>
-        <span className="trigger-label">{label}</span>
+        <span className="trigger-label">{tx(label)}</span>
       </button>
       {at && createPortal(
-        <div ref={panel} className="trigger-float" style={{ right: at.right, top: at.top, bottom: at.bottom }} role="dialog" aria-label="Take profit and stop loss">
+        <div ref={panel} className="trigger-float" style={{ right: at.right, top: at.top, bottom: at.bottom }} role="dialog" aria-label={tx("Take profit and stop loss")}>
           {/* Mounted each time it opens, so its boxes start from what is set at that moment. */}
           <TriggerMenu position={position} market={market} mark={mark} current={{ tp, sl }} onDone={() => { setAt(null); button.current?.focus(); }} />
         </div>, document.body
@@ -207,9 +208,9 @@ function TriggerMenu({ position, market, mark, current, onDone }: { position: Po
       <TriggerFields market={market} shape={shape} tp={tp} sl={sl} setTp={setTp} setSl={setSl} check={check} disabled={busy} />
       {saveError && <p className="trigger-error" role="alert">{saveError}</p>}
       <button className="btn primary wide" disabled={busy || check.error !== null || unchanged} onClick={save}>
-        {busy ? "Saving" : "Save"}
+        {busy ? tx("Saving") : tx("Save")}
       </button>
-      <p className="note">Closes the position at the first price two seconds after one is touched, as if you had clicked Close then. Clear a box to remove it.</p>
+      <p className="note">{tx("Closes the position at the first price two seconds after one is touched, as if you had clicked Close then. Clear a box to remove it.")}</p>
     </div>
   );
 }
