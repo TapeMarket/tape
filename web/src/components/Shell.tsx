@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { claimUsername } from "../lib/actions";
 import { post } from "../lib/api";
-import { big, percent, price, priceNumber, shortAddress, usd, usdDown, usdNumber } from "../lib/format";
+import { big, percent, price, priceNumber, shortAddress, usd, usdExact, usdNumber } from "../lib/format";
 import { BRAND, LEGACY, PREVIEW, exchangeHref } from "../lib/mode";
 import { navigate, setState, toast, useStore } from "../lib/store";
 import { connectWith, disconnect, walletOptions, type WalletOption } from "../lib/wallet";
@@ -200,7 +200,7 @@ export function TopBar() {
                 <strong className="wallet-summary-owner">{account?.name ?? shortAddress(owner)}</strong>
                 <dl>
                   <div className="wallet-summary-total"><dt>Total balance</dt><dd>{account ? usd(balance) : "—"}</dd></div>
-                  <div><dt>Available to withdraw</dt><dd>{account ? usdDown(available) : "—"}</dd></div>
+                  <div><dt>Available to withdraw</dt><dd>{account ? usdExact(available) : "—"}</dd></div>
                   {margin > 0n && <div><dt>In open positions</dt><dd>{usd(margin)}</dd></div>}
                   {reserved > 0n && <div><dt>Pending orders</dt><dd>{usd(reserved)}</dd></div>}
                   <div><dt>Queued winnings</dt><dd>{account ? usd(queued) : "—"}</dd></div>

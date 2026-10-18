@@ -74,6 +74,9 @@ try {
   await page.keyboard.press("Escape");
   await patch({ balance: "20776100", queued: "0" }); await expectTotal("$20.78");
   assert.equal(await page.locator(".wallet-queue-label").count(), 0);
+  await page.locator(".wallet-main").click();
+  assert.equal(await row("Available to withdraw").innerText(), "20.7761 USDC");
+  await page.keyboard.press("Escape");
   console.log("PASS: queued funds cannot be withdrawn early; paying the queue preserves the total without double-counting or losing a cent.");
   await patch({ balance: "20000000", queued: "776100", reserved: "5000000" }); await expectTotal("$20.78");
   await page.locator(".wallet-main").click();
