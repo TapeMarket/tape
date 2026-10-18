@@ -82,7 +82,7 @@ function BrandBand() {
 }
 
 function TermsBand() {
-  const words = ["1000x leverage", "0 fees to open", "0 funding", "Crypto, gold and stocks", "Settled in USDC"];
+  const words = ["1000x leverage", "0 fees to open", "0 funding", "0 market impact", "Crypto, gold and stocks", "Fully onchain settlement", "Settled in USDC"];
   return <Band className="band-b">{[0, 1].flatMap((n) => words.map((word) => <span className="band-item" key={`${n}${word}`}>{word}</span>))}</Band>;
 }
 
@@ -163,8 +163,8 @@ export function Landing() {
               <span>Up to <em>{leverage}x</em>.</span>
             </h1>
             <p className="rise" style={delay(0.3)}>
-              Crypto, stocks, gold and the S&amp;P 500. Settled in USDC on Ethereum.
-              No opening fee or funding. Leverage varies by market.
+              Crypto, stocks, gold and the S&amp;P 500. 0 market impact on underlying prices.
+              Fully onchain USDC settlement on Ethereum. No opening fee or funding. Leverage varies by market.
             </p>
             <div className="lp-cta rise" style={delay(0.42)}>
               <Link to="/trade" className="lp-btn primary">
