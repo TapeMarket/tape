@@ -44,11 +44,11 @@ try {
   assert.equal(reads.length, 0, 'Current trading no longer fetches historical account balances');
   assert.equal(await page.locator('.wallet-text b').innerText(), '$25.00');
   await page.locator('.top-nav').getByRole('button', { name: 'More', exact: true }).click();
-  for (const old of deployment.previousExchanges) assert.equal(await page.getByRole('link', { name: `Previous exchange v${old.version}`, exact: true }).getAttribute('href'), old.siteUrl);
+  assert.equal(await page.getByRole('menu').getByRole('link', { name: /Previous exchange|TradingView/ }).count(), 0);
   await page.keyboard.press('Escape');
   await page.evaluate(other => window.__set({ owner: other, account: null }), other);
   assert.equal(await page.locator('.banner').count(), 0);
-  console.log('PASS: no automatic historical-balance banners or fetches; both withdrawal links are available in More.');
+  console.log('PASS: no automatic historical-balance banners or fetches; More omits historical exchanges and TradingView.');
   await open('?legacy=1');
   assert.equal(await page.evaluate(() => window.__api), 'https://api.tapemarket.io/v1');
   await page.getByText('Previous exchange.', { exact: true }).waitFor();
@@ -75,8 +75,7 @@ try {
     { address: '0x4000000000000000000000000000000000000004', apiUrl: 'https://api.tapemarket.io/v2', siteUrl: '/trade?legacy=2', version: 2 },
   ], recovery: { controller: '0x5000000000000000000000000000000000000005', paused: true, available: true, checkedAt: Date.now() } } }));
   await page.locator('.top-nav').getByRole('button', { name: 'More', exact: true }).click();
-  await page.getByRole('link', { name: 'Previous exchange v1', exact: true }).waitFor();
-  await page.getByRole('link', { name: 'Previous exchange v2', exact: true }).waitFor();
+  assert.equal(await page.getByRole('menu').getByRole('link', { name: /Previous exchange|TradingView/ }).count(), 0);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Withdraw USDC', exact: true }).click();
   await page.getByText('Paid by your wallet', { exact: true }).waitFor();

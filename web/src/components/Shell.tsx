@@ -82,10 +82,8 @@ function Quote({ id, symbol, ref24h }: { id: number; symbol: string; ref24h?: nu
   );
 }
 
-/** Everything under "More": the other pages, then the small print. */
+/** The secondary pages shared by the desktop and mobile More menus. */
 function MoreItems() {
-  const config = useStore(s => s.config);
-  const previous = config?.previousExchanges ?? (config?.previousExchange ? [config.previousExchange] : []);
   return (
     <>
       {MORE.map(([to, label]) => (
@@ -93,13 +91,6 @@ function MoreItems() {
           {tx(label)}
         </Link>
       ))}
-      {!PREVIEW && previous.length > 0 && <>
-        <hr className="menu-rule" />
-        {previous.map(deployment => <a key={deployment.address} href={deployment.siteUrl}><Localized message={"Previous exchange{0}"} values={[deployment.version ? ` v${deployment.version}` : ""]} /></a>)}
-      </>}
-      <hr className="menu-rule" />
-      {/* The chart library's licence asks for this credit on the site. */}
-      <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">{tx("Charts by TradingView")}</a>
       {PREVIEW && (
         <button
           onClick={async () => {
