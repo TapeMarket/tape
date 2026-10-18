@@ -120,9 +120,9 @@ export function navigate(to: string): void {
   // Market shortcuts and portfolio tabs also navigate without a Link component. Keep them
   // on the same contract after a reload, just like the main navigation's legacy links.
   const current = new URLSearchParams(location.search);
-  if (current.get("legacy") === "1" && current.get("preview") !== "1") {
+  if (["1", "2"].includes(current.get("legacy") ?? "") && current.get("preview") !== "1") {
     const target = new URL(to, "https://tape.invalid");
-    target.searchParams.set("legacy", "1");
+    target.searchParams.set("legacy", current.get("legacy")!);
     to = target.pathname + target.search + target.hash;
   }
   const [path] = to.split("?");

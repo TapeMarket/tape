@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { claimUsername } from "../lib/actions";
 import { post } from "../lib/api";
 import { big, percent, price, priceNumber, shortAddress, usdDown, usdNumber } from "../lib/format";
-import { BRAND, LEGACY, PREVIEW } from "../lib/mode";
+import { BRAND, LEGACY, PREVIEW, exchangeHref } from "../lib/mode";
 import { navigate, setState, toast, useStore } from "../lib/store";
 import { connectWith, disconnect, walletOptions, type WalletOption } from "../lib/wallet";
 import type { TapeChip } from "../lib/types";
@@ -65,7 +65,7 @@ function Quote({ id, symbol, ref24h }: { id: number; symbol: string; ref24h?: nu
   const change = ref24h && now ? now / ref24h - 1 : null;
   return (
     <a
-      href={LEGACY ? "/trade?legacy=1" : "/trade"}
+      href={exchangeHref("/trade")}
       className="quote"
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -395,7 +395,9 @@ function UsernameDialog() {
 export function Dialogs() {
   const dialog = useStore((s) => s.dialog);
   const owner = useStore((s) => s.owner);
+  const recovery = useStore((s) => s.config?.recovery);
   if (dialog === "connect") return <ConnectDialog />;
+  if (dialog === "deposit" && recovery?.paused) return <Dialog title="Deposits paused"><p>Deposits are unavailable during emergency recovery. Your available trading balance can be withdrawn to your wallet.</p><button className="btn primary" onClick={() => setState({ dialog: "withdraw" })}>Withdraw USDC</button></Dialog>;
   if (dialog === "deposit" && LEGACY) return <Dialog title="Previous exchange"><p>Deposits have moved to the current exchange.</p><a className="btn primary" href="/trade">Open current Tape</a></Dialog>;
   // Ready with the exchange shell: opening a money action must not wait for another script.
   if (dialog === "deposit") return <DepositDialog key={owner} />;

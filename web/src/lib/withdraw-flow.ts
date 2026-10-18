@@ -4,7 +4,7 @@ export interface WithdrawFlow {
   id: number;
   owner: Address;
   amount: string;
-  stage: "preparing" | "wallet" | "submitting" | "pending" | "complete" | "error";
+  stage: "preparing" | "wallet" | "submitting" | "confirming" | "pending" | "complete" | "error";
   tx?: Hex;
   error?: string;
   baseline: Transfer[];

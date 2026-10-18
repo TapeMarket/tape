@@ -82,6 +82,26 @@ test("a declined withdrawal preserves its amount and can retry with a new flow",
   f.signer.signTypedData=async()=> '0x11';assert.equal(await f.withdraw(10_123456n),true);assert.equal(f.withdrawal().stage,'complete');
 });
 
+test("emergency withdrawals use a direct wallet transaction and ignore disabled trading reservations", async t => {
+  const f=fixture(t), originalGet=globalThis.__funding.get;
+  f.setState({config:{...f.getState().config,addresses:{...f.getState().config.addresses,exchange:pin.box},recovery:{paused:true,available:true}}});
+  globalThis.__funding.get=async path=>path==='/config'?f.getState().config:path.startsWith('/account/')?{balance:'25000000',reserved:'25000000',withdrawNonce:'1'}:originalGet(path);
+  f.signer.write=async(call,submitted)=>{f.writes.push(call);submitted(hash);assert.equal(f.withdrawal().stage,'confirming');return hash;};
+  assert.equal(await f.withdraw(25_000000n),true);
+  assert.equal(f.writes[0].functionName,'emergencyWithdraw');
+  assert.equal(f.writes[0].address,pin.box);
+  assert.deepEqual(f.writes[0].args,[25_000000n]);
+  assert.equal(f.posts.length,0);assert.equal(f.permits.length,0);assert.equal(f.withdrawal().stage,'complete');
+});
+
+test("unavailable recovery status cannot send a withdrawal to an unknown implementation", async t => {
+  const f=fixture(t), originalGet=globalThis.__funding.get;
+  f.setState({config:{...f.getState().config,recovery:{paused:true,available:false}}});
+  globalThis.__funding.get=async path=>path==='/config'?f.getState().config:originalGet(path);
+  assert.equal(await f.withdraw(1_000000n),false);
+  assert.equal(f.writes.length,0);assert.equal(f.posts.length,0);assert.equal(f.permits.length,0);
+});
+
 test("withdrawal fresh balance and wallet changes are checked before any money request is sent", async t => {
   const f=fixture(t), accountGet=globalThis.__funding.get;
   globalThis.__funding.get=async path=>path.startsWith('/account/')?{balance:'25000000',reserved:'20000000',withdrawNonce:'1'}:accountGet(path);

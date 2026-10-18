@@ -3,6 +3,7 @@
   "private": true,
   "description": "1000x synthetic perps on Ethereum, against a house that starts from zero",
   "scripts": {
+    "test:hybrid": "node tools/test-hybrid.mjs",
     "test": "forge test",
     "test:fast": "node tools/deployable.mjs --fast --forge && forge test --match-contract FastExchangeTest",
     "test:migration-ui": "node web/e2e/exchange-migration.mjs",

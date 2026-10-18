@@ -1,0 +1,800 @@
+[
+  {
+    "label": "withdrawNonces",
+    "slot": "0",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => uint256)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "bytes": "32"
+      }
+    }
+  },
+  {
+    "label": "_owner",
+    "slot": "1",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "_pendingOwner",
+    "slot": "2",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "_markets",
+    "slot": "3",
+    "offset": 0,
+    "type": {
+      "encoding": "dynamic_array",
+      "label": "struct Market[]",
+      "bytes": "32",
+      "base": {
+        "encoding": "inplace",
+        "label": "struct Market",
+        "bytes": "192",
+        "members": [
+          {
+            "label": "feedId",
+            "slot": "0",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "bytes32",
+              "bytes": "32"
+            }
+          },
+          {
+            "label": "maxLeverage",
+            "slot": "1",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint16",
+              "bytes": "2"
+            }
+          },
+          {
+            "label": "maxKeepBps",
+            "slot": "1",
+            "offset": 2,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint16",
+              "bytes": "2"
+            }
+          },
+          {
+            "label": "maxConfBps",
+            "slot": "1",
+            "offset": 4,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint16",
+              "bytes": "2"
+            }
+          },
+          {
+            "label": "rateMultiplier",
+            "slot": "1",
+            "offset": 6,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint32",
+              "bytes": "4"
+            }
+          },
+          {
+            "label": "positionMultiplier",
+            "slot": "1",
+            "offset": 10,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint32",
+              "bytes": "4"
+            }
+          },
+          {
+            "label": "tick",
+            "slot": "1",
+            "offset": 14,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint32",
+              "bytes": "4"
+            }
+          },
+          {
+            "label": "bustBuffer",
+            "slot": "1",
+            "offset": 18,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint64",
+              "bytes": "8"
+            }
+          },
+          {
+            "label": "retired",
+            "slot": "1",
+            "offset": 26,
+            "type": {
+              "encoding": "inplace",
+              "label": "bool",
+              "bytes": "1"
+            }
+          },
+          {
+            "label": "retiredAt",
+            "slot": "2",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint64",
+              "bytes": "8"
+            }
+          },
+          {
+            "label": "frozenPrice",
+            "slot": "2",
+            "offset": 8,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint64",
+              "bytes": "8"
+            }
+          },
+          {
+            "label": "maxNotional",
+            "slot": "2",
+            "offset": 16,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint80",
+              "bytes": "10"
+            }
+          },
+          {
+            "label": "depth",
+            "slot": "2",
+            "offset": 26,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint32",
+              "bytes": "4"
+            }
+          },
+          {
+            "label": "oiLong",
+            "slot": "3",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint96",
+              "bytes": "12"
+            }
+          },
+          {
+            "label": "oiShort",
+            "slot": "3",
+            "offset": 12,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint96",
+              "bytes": "12"
+            }
+          },
+          {
+            "label": "capLong",
+            "slot": "4",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint96",
+              "bytes": "12"
+            }
+          },
+          {
+            "label": "capShort",
+            "slot": "4",
+            "offset": 12,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint96",
+              "bytes": "12"
+            }
+          },
+          {
+            "label": "sizeLong",
+            "slot": "5",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint128",
+              "bytes": "16"
+            }
+          },
+          {
+            "label": "sizeShort",
+            "slot": "5",
+            "offset": 16,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint128",
+              "bytes": "16"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "_positions",
+    "slot": "4",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(bytes32 => struct Position)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "bytes32",
+        "bytes": "32"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "struct Position",
+        "bytes": "64",
+        "members": [
+          {
+            "label": "owner",
+            "slot": "0",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "address",
+              "bytes": "20"
+            }
+          },
+          {
+            "label": "market",
+            "slot": "0",
+            "offset": 20,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint16",
+              "bytes": "2"
+            }
+          },
+          {
+            "label": "leverage",
+            "slot": "0",
+            "offset": 22,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint16",
+              "bytes": "2"
+            }
+          },
+          {
+            "label": "isLong",
+            "slot": "0",
+            "offset": 24,
+            "type": {
+              "encoding": "inplace",
+              "label": "bool",
+              "bytes": "1"
+            }
+          },
+          {
+            "label": "index",
+            "slot": "0",
+            "offset": 25,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint16",
+              "bytes": "2"
+            }
+          },
+          {
+            "label": "openTime",
+            "slot": "0",
+            "offset": 27,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint40",
+              "bytes": "5"
+            }
+          },
+          {
+            "label": "margin",
+            "slot": "1",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint80",
+              "bytes": "10"
+            }
+          },
+          {
+            "label": "debtMargin",
+            "slot": "1",
+            "offset": 10,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint80",
+              "bytes": "10"
+            }
+          },
+          {
+            "label": "entryPrice",
+            "slot": "1",
+            "offset": 20,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint64",
+              "bytes": "8"
+            }
+          },
+          {
+            "label": "impactNotional",
+            "slot": "1",
+            "offset": 28,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint32",
+              "bytes": "4"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "_openIds",
+    "slot": "5",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => bytes32[])",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "dynamic_array",
+        "label": "bytes32[]",
+        "bytes": "32",
+        "base": {
+          "encoding": "inplace",
+          "label": "bytes32",
+          "bytes": "32"
+        }
+      }
+    }
+  },
+  {
+    "label": "closeRequestedAt",
+    "slot": "6",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(bytes32 => uint64)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "bytes32",
+        "bytes": "32"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "uint64",
+        "bytes": "8"
+      }
+    }
+  },
+  {
+    "label": "usedIntent",
+    "slot": "7",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(bytes32 => bool)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "bytes32",
+        "bytes": "32"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "bool",
+        "bytes": "1"
+      }
+    }
+  },
+  {
+    "label": "balances",
+    "slot": "8",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => uint256)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "bytes": "32"
+      }
+    }
+  },
+  {
+    "label": "withdrawRequests",
+    "slot": "9",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => struct WithdrawRequest)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "struct WithdrawRequest",
+        "bytes": "32",
+        "members": [
+          {
+            "label": "amount",
+            "slot": "0",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint128",
+              "bytes": "16"
+            }
+          },
+          {
+            "label": "requestedAt",
+            "slot": "0",
+            "offset": 16,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint64",
+              "bytes": "8"
+            }
+          },
+          {
+            "label": "closedAt",
+            "slot": "0",
+            "offset": 24,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint64",
+              "bytes": "8"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "treasury",
+    "slot": "10",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "totalBalances",
+    "slot": "11",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "totalCashMargin",
+    "slot": "12",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "debtMarginOpen",
+    "slot": "13",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "stakerFees",
+    "slot": "14",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "devFees",
+    "slot": "15",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "claims",
+    "slot": "16",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(uint256 => struct Claim)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "bytes": "32"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "struct Claim",
+        "bytes": "32",
+        "members": [
+          {
+            "label": "user",
+            "slot": "0",
+            "offset": 0,
+            "type": {
+              "encoding": "inplace",
+              "label": "address",
+              "bytes": "20"
+            }
+          },
+          {
+            "label": "amount",
+            "slot": "0",
+            "offset": 20,
+            "type": {
+              "encoding": "inplace",
+              "label": "uint96",
+              "bytes": "12"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "queueHead",
+    "slot": "17",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "queueTail",
+    "slot": "18",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "totalQueued",
+    "slot": "19",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "bytes": "32"
+    }
+  },
+  {
+    "label": "queuedOf",
+    "slot": "20",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => uint256)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "bytes": "32"
+      }
+    }
+  },
+  {
+    "label": "queueSpent",
+    "slot": "21",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => uint256)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "bytes": "32"
+      }
+    }
+  },
+  {
+    "label": "isOperator",
+    "slot": "22",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(address => bool)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "address",
+        "bytes": "20"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "bool",
+        "bytes": "1"
+      }
+    }
+  },
+  {
+    "label": "guardian",
+    "slot": "23",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "devRecipient",
+    "slot": "24",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "staking",
+    "slot": "25",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "lossMining",
+    "slot": "26",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "sweeper",
+    "slot": "27",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "address",
+      "bytes": "20"
+    }
+  },
+  {
+    "label": "opensPaused",
+    "slot": "27",
+    "offset": 20,
+    "type": {
+      "encoding": "inplace",
+      "label": "bool",
+      "bytes": "1"
+    }
+  },
+  {
+    "label": "minMargin",
+    "slot": "28",
+    "offset": 0,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint96",
+      "bytes": "12"
+    }
+  },
+  {
+    "label": "minNotional",
+    "slot": "28",
+    "offset": 12,
+    "type": {
+      "encoding": "inplace",
+      "label": "uint96",
+      "bytes": "12"
+    }
+  },
+  {
+    "label": "_executionTime",
+    "slot": "29",
+    "offset": 0,
+    "type": {
+      "encoding": "mapping",
+      "label": "mapping(bytes32 => uint64)",
+      "bytes": "32",
+      "key": {
+        "encoding": "inplace",
+        "label": "bytes32",
+        "bytes": "32"
+      },
+      "value": {
+        "encoding": "inplace",
+        "label": "uint64",
+        "bytes": "8"
+      }
+    }
+  }
+]

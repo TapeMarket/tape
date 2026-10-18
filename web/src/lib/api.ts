@@ -35,7 +35,7 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   return json;
 }
 
-const STREAM_EVENTS = ["hello", "tick", "reference", "intent", "position", "position-removed", "trigger", "jackpot", "closed", "balance", "trade", "tape", "house", "distribution"];
+const STREAM_EVENTS = ["hello", "tick", "reference", "intent", "position", "position-removed", "trigger", "jackpot", "closed", "balance", "trade", "tape", "house", "distribution", "recovery"];
 
 const live: Backend = {
   get: (path) => request(path),
@@ -315,6 +315,11 @@ function handle(type: string, data: unknown): void {
       setState((s) => ({ tape: [chip, ...s.tape].slice(0, 40) }));
       break;
     }
+    case "recovery":
+      setState(s => s.config ? { config: { ...s.config, recovery: data as Config["recovery"], opensPaused: true } } : {});
+      void loadConfig();
+      refreshAccountSoon(0);
+      break;
     case "reload":
       // The preview was started over (possibly from another tab): begin again from nothing.
       location.reload();

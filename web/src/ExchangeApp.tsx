@@ -8,7 +8,7 @@ import { getState, setState, useStore } from "./lib/store";
 import { loadDayOpen } from "./lib/preview/feed";
 import { coinOf } from "./lib/hl";
 import { LEGACY, PREVIEW } from "./lib/mode";
-import { PreviousExchange } from "./components/PreviousExchange";
+import { PreviousExchange, RecoveryBanner } from "./components/PreviousExchange";
 
 const ROUTES: Record<string, ComponentType> = {};
 for (const [path, load] of Object.entries(PAGE_LOADERS)) ROUTES[path] = lazy(load);
@@ -56,6 +56,7 @@ export default function ExchangeApp() {
   return <div className="app">
     <TopBar />
     <Banner />
+    <RecoveryBanner />
     <PreviousExchange />
     <main className="page"><Suspense fallback={<div className="empty" role="status">Loading page…</div>}>
       {ready ? <Page /> : <div className="empty" role="status" style={{ minHeight: "50vh", display: "grid", placeContent: "center", gap: 16, textAlign: "center" }}>

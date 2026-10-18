@@ -283,6 +283,7 @@ export function createTxQueue({ chain, log, config = {}, onSettled = () => {}, o
   }
 
   function push(job) {
+    if (config.recoveryState?.paused) return Promise.resolve({ ok: false, error: "Emergency recovery is active. Use emergency withdrawal." });
     return new Promise((resolve) => {
       const queued = { contract: "exchange", ...job };
       let settled = false;
@@ -311,6 +312,10 @@ export function createTxQueue({ chain, log, config = {}, onSettled = () => {}, o
     lane.busy = true;
     const taken = lane === lanes.others ? [lane.jobs.shift()] : lane.jobs.splice(0, MAX_BATCH);
     try {
+      if (config.recoveryState?.paused) {
+        for (const job of taken) job.done({ ok: false, error: "Emergency recovery is active." });
+        return;
+      }
       if (lane === lanes.others) await sendAlone(taken[0]);
       else await sendBatch(taken);
     } catch (error) {

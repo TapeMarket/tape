@@ -45,8 +45,11 @@ export interface TapeChip {
   time: number;
 }
 
+export interface PreviousDeployment { address: Address; apiUrl: string; siteUrl: string; version?: number }
 export interface Config {
-  previousExchange?: { address: Address; apiUrl: string; siteUrl: string };
+  previousExchange?: PreviousDeployment;
+  previousExchanges?: PreviousDeployment[];
+  recovery?: { paused: boolean; available: boolean; controller: Address; custodyVault?: Address | null; checkedAt: number };
   name: string;
   chainId: number;
   time: number;

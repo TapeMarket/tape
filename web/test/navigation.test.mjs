@@ -33,3 +33,11 @@ test("forced practice mode does not retain a legacy exchange flag through naviga
   f.store.navigate("/trade?preview=1");
   assert.equal(f.location.search, "?preview=1");
 });
+
+test("second previous exchange remains selected across portfolio and market navigation", () => {
+  const f = fixture("?legacy=2");
+  f.store.navigate("/portfolio?tab=history");
+  assert.equal(f.location.search, "?tab=history&legacy=2");
+  f.store.navigate("/trade");
+  assert.equal(f.location.search, "?legacy=2");
+});

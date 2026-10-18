@@ -32,6 +32,7 @@ import { ReferralRefused } from "./referrals.mjs";
 import { createReferralCodes } from "./referral-codes.mjs";
 import { readAccountSnapshot } from "./account-balance.mjs";
 import { createSupport } from "./support.mjs";
+import { refreshRecovery } from "./recovery.mjs";
 import { EXEC_DELAY, PIN_WINDOW, INTENT_TTL, DIRECT_DELAY, WITHDRAW_DELAY, GRACE, REQUEST_EXPIRY } from "../../shared/eip712.mjs";
 import { Rejected, toJson, acct, lower, nowSeconds, isAddr } from "./util.mjs";
 
@@ -170,6 +171,8 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
       time: Date.now(),
       priceSource: source.name,
       ...(d.previousExchange ? { previousExchange: d.previousExchange } : {}),
+      ...(d.previousExchanges ? { previousExchanges: d.previousExchanges } : {}),
+      ...(config.recoveryState ? { recovery: config.recoveryState } : {}),
       addresses,
       usdcPermit: { name: d.usdcPermitName ?? "USD Coin", version: d.usdcPermitVersion ?? "2" },
       timing: {
@@ -184,7 +187,7 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
       markets: store.markets.map((m) => ({ ...m, price: book.latest(m.id)?.price ?? null, ref24h: sampler.reference(m.id) })),
       minMargin: store.house?.minMargin ?? 0n,
       minNotional: store.house?.minNotional ?? 0n,
-      opensPaused: config.readOnlyOpens || (store.house?.opensPaused ?? false),
+      opensPaused: config.readOnlyOpens || config.recoveryState?.paused || (store.house?.opensPaused ?? false),
       coin: addresses.coin ? { address: addresses.coin, staking: addresses.staking, lossMining: addresses.lossMining, symbol: d.coinSymbol ?? "COIN" } : null,
       tape: store.tape.slice(0, 40),
     };
@@ -700,6 +703,9 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
     if (req.method === "POST") {
       const handler = posts[path];
       if (!handler) throw new Rejected("Not found.", 404);
+      if (config.recoveryState?.paused && ["/open", "/close", "/trigger", "/trigger/cancel", "/session", "/deposit", "/withdraw"].includes(path)) {
+        throw new Rejected("Emergency recovery is active. Withdraw available USDC directly from your wallet.", 409);
+      }
       return send(res, 200, await handler(await readBody(req)));
     }
     if (req.method !== "GET") throw new Rejected("Method not allowed.", 405);
@@ -774,6 +780,20 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
   // Ticks are the one high-rate topic: publish each print as it arrives.
   book.onTick((marketId, print) => hub.publish("tick", "tick", { m: marketId, t: print.time, p: print.price }));
 
+  let checkingRecovery = false;
+  const recoveryTimer = d.upgradeController ? setInterval(async () => {
+    if (checkingRecovery) return;
+    checkingRecovery = true;
+    try {
+      const previous = config.recoveryState;
+      const current = await refreshRecovery({ config, chain });
+      if (current && (previous?.paused !== current.paused || previous?.available !== current.available || previous?.custodyVault !== current.custodyVault)) {
+        hub.publish("public", "recovery", current);
+      }
+    } finally { checkingRecovery = false; }
+  }, 2500) : null;
+  recoveryTimer?.unref?.();
+
   return {
     /** A custom code or username's wallet, lower case. */
     addressOfName: (name) => referralCodes.addressOf(name) ?? taken.get(name),
@@ -790,6 +810,7 @@ export function createApi({ config, chain, book, store, engine, indexer, hub, so
     // Every visitor holds an event stream open, and close() alone waits for all of them to leave.
     close: () =>
       new Promise((resolve) => {
+        if (recoveryTimer) clearInterval(recoveryTimer);
         server.close(resolve);
         server.closeAllConnections?.();
       }),

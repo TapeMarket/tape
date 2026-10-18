@@ -46,11 +46,13 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const FAST = process.argv.includes("--fast");
-const DIR = join(ROOT, "deployable", ...(FAST ? ["fast"] : []));
-if (FAST) {
+const HYBRID = process.argv.includes("--hybrid");
+if (FAST && HYBRID) throw Error("Choose --fast or --hybrid");
+const DIR = join(ROOT, "deployable", ...(HYBRID ? ["hybrid"] : FAST ? ["fast"] : []));
+if (FAST || HYBRID) {
   process.env.FOUNDRY_PROFILE = "fast";
-  process.env.FOUNDRY_OUT ??= "out-fast";
-  process.env.FOUNDRY_CACHE_PATH ??= "cache-fast";
+  process.env.FOUNDRY_OUT ??= HYBRID ? "out-hybrid" : "out-fast";
+  process.env.FOUNDRY_CACHE_PATH ??= HYBRID ? "cache-hybrid" : "cache-fast";
 }
 const PROJECT_OUT = (process.env.FOUNDRY_OUT ?? "out").replace(/\/+$/, "");
 const CHECK = process.argv.includes("--check");
@@ -60,7 +62,12 @@ const SIZE_LIMIT = 24_576;
 const SIZE_WARNING = 200;
 
 // Everything script/Deploy.s.sol and script/AttachCoin.s.sol create.
-const CONTRACTS = FAST ? ["src/FastExchange.sol:FastExchange", "src/ExecutionOracle.sol:ExecutionOracle"] : [
+const CONTRACTS = HYBRID ? [
+  "src/FastExchange.sol:FastExchange", "src/ExecutionOracle.sol:ExecutionOracle",
+  "src/ExchangeBootstrap.sol:ExchangeBootstrap", "src/EmergencyExchange.sol:EmergencyExchange",
+  "src/EmergencyCustodyVault.sol:EmergencyCustodyVault",
+  "src/HybridUpgradeController.sol:HybridUpgradeController", "src/HybridExchangeProxy.sol:HybridExchangeProxy",
+] : FAST ? ["src/FastExchange.sol:FastExchange", "src/ExecutionOracle.sol:ExecutionOracle"] : [
   "src/Exchange.sol:Exchange",
   "src/Pricing.sol:Pricing",
   "src/SignedOracle.sol:SignedOracle",
@@ -110,7 +117,7 @@ if (FORGE) {
   console.log("forge clean, then each contract on its own, then the rest (a few minutes)");
   forge("clean");
   for (const target of CONTRACTS) forge("build", target.split(":")[0]);
-  if (!FAST) forge("build");
+  if (!FAST && !HYBRID) forge("build");
 }
 
 const scratch = mkdtempSync(join(tmpdir(), "deployable-"));
@@ -148,7 +155,7 @@ try {
 
     // What is asked for does not change what is compiled; the input kept for Etherscan is forge's own.
     const asked = structuredClone(input);
-    asked.settings.outputSelection = { [file]: { [name]: ["abi", "evm.bytecode.object", "evm.deployedBytecode.object"] } };
+    asked.settings.outputSelection = { [file]: { [name]: ["abi", "storageLayout", "evm.bytecode.object", "evm.deployedBytecode.object"] } };
     const askedFile = join(scratch, `${name}.json`);
     writeFileSync(askedFile, JSON.stringify(asked));
     const output = JSON.parse(execFileSync(solc, ["--standard-json", askedFile], { maxBuffer: 1 << 30 }).toString());
@@ -159,7 +166,7 @@ try {
     const runtime = built.evm.deployedBytecode.object;
     if (creation.includes("__$")) throw new Error(`${name} needs a library linked in, which this does not do`);
 
-    files.set(`${name}.json`, pretty({ contract: target, solc: version, abi: built.abi, bytecode: { object: `0x${creation}` }, deployedBytecode: { object: `0x${runtime}` } }));
+    files.set(`${name}.json`, pretty({ contract: target, solc: version, abi: built.abi, storageLayout: built.storageLayout, bytecode: { object: `0x${creation}` }, deployedBytecode: { object: `0x${runtime}` } }));
     // Untouched, this is byte for byte what `forge verify-contract` sends.
     files.set(`${name}.input.json`, `${rewritten ? JSON.stringify(input) : inputText}\n`);
 

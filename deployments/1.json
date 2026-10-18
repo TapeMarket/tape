@@ -9,16 +9,37 @@
   "pricing": "0xd170144B7b2F6B3423Ac5974F29c1FED4759Cf93",
   "sessions": "0x2d1dd1980c050E509042Fee55B91184c3979940F",
   "priceSigner": "0x1377c563693FEeB4ff88936779fba583197FAF4E",
-  "oracle": "0x3c6dcFbcCD0deB7b682492ac89CAB6cCE6538055",
-  "exchange": "0x06FDA5DF6C1a8BbC24bF4A2E717302163E23b062",
-  "lens": "0x91490008aa27Be3988B109D22b666537e703F89E",
-  "gateway": "0x54f7c8DFAaB564957d53f0ecfBa8EdD9F6C8070C",
-  "batcher": "0x42883d81D4CC1c541B7B728cCd103BC40F35A799",
-  "deposits": "0x937292c6D7F8dB3784c91cE8DFaa6F8352224Ceb",
+  "oracle": "0x55fF6BFF62DAa08Fe4861B0b9E1D2e2E256498FE",
+  "implementation": "0x162Ff8b2cD2CEe7AFd12Dc907c0910Da918b6028",
+  "bootstrap": "0x100455f873A8c43bf097a16d895d75Db71c382eB",
+  "emergencyImplementation": "0xb21ba547b0F801bCe1c3732317B4d38F71CbBb85",
+  "upgradeController": "0xDefFD8B323d2A99e9B4C2A0E4d178FEbdE120AD5",
+  "exchange": "0xeC35098521Cfc3B4F262FEE9c19603658019DF3C",
+  "lens": "0x0714b510E3216785A5DbcD0e0888c025F1F4d2ac",
+  "gateway": "0xf7881C67827449719924720f39b176B7dB07F930",
+  "batcher": "0x1ed370B476d56B3F8e04C153f95444fdEC19DC89",
+  "deposits": "0x2D037FC23E83fACB09a67f6c0BE0Ec03B8485582",
   "previousExchange": {
-    "address": "0x77DB922a0C4CBB77056243785D00A70676f700C1",
-    "apiUrl": "https://api.tapemarket.io/v1",
-    "siteUrl": "https://tapemarket.io/trade?legacy=1"
+    "address": "0x06FDA5DF6C1a8BbC24bF4A2E717302163E23b062",
+    "apiUrl": "https://api.tapemarket.io/v2",
+    "siteUrl": "https://tapemarket.io/trade?legacy=2",
+    "version": 2
   },
-  "block": 26214812
+  "previousExchanges": [
+    {
+      "address": "0x06FDA5DF6C1a8BbC24bF4A2E717302163E23b062",
+      "apiUrl": "https://api.tapemarket.io/v2",
+      "siteUrl": "https://tapemarket.io/trade?legacy=2",
+      "version": 2
+    },
+    {
+      "address": "0x77DB922a0C4CBB77056243785D00A70676f700C1",
+      "apiUrl": "https://api.tapemarket.io/v1",
+      "siteUrl": "https://tapemarket.io/trade?legacy=1",
+      "version": 1
+    }
+  ],
+  "apiVersion": 3,
+  "block": 26218880,
+  "proxyAdmin": "0x49846F11Be6d7506F7dfc902bd764E07c6A2b666"
 }

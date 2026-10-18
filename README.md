@@ -4,7 +4,7 @@ Synthetic perpetuals on Ethereum at up to 1000x, traded against a house (the vau
 that starts with nothing. The coin is `$TAPE`; the site is
 [tapemarket.io](https://tapemarket.io).
 
-**Status: Ethereum core deployed.** The exchange and its seven supporting contracts are live on
+**Status: Ethereum hybrid exchange deployed.** The exchange and its supporting contracts are live on
 Ethereum; the coin, staking, loss rewards and jackpot are not deployed or attached. The site uses
 the live exchange by default; `?preview=1` opens practice mode. It has not been audited by an outside firm: read
 [Review](#review) and [Status](#status) before putting money in.
@@ -47,30 +47,94 @@ transaction. The inbox supports live replies, unread counts, resolution, and bro
 
 ## Deployed
 
+### Live hybrid upgrade and recovery contracts
+
+The hybrid contracts are deployed on Ethereum and the site uses `/v3`. Your existing controller wallet administers the exchange and upgrades.
+`HybridExchangeProxy` gives a new deployment a stable address while its reviewed trading
+implementation can be replaced. Markets, balances, positions, withdrawal nonces and payout-queue
+state remain in the proxy. The upgrade owner is trusted: replacement code can change fund
+handling. Use a multisig or timelock as upgrade owner when that matches the operational policy.
+
+`HybridUpgradeController` separates code upgrades from an immediate emergency response:
+
+- The configured guardian or upgrade owner calls `emergencyPause()`. This atomically installs
+  the precommitted `EmergencyExchange` implementation and disables all normal trading and deposit
+  entry points. The guardian cannot choose arbitrary replacement code or resume trading.
+- The guardian or exchange owner can call `evacuateToVault()` during recovery to move the
+  entire actual USDC holding into a dedicated rescue contract. This preserves every account,
+  position and queue claim. The vault can release funds only back to its source proxy, which
+  uses them for withdrawals or migration. A repair recalls remaining custody atomically.
+- A customer calls `emergencyWithdraw(amount)` to send their **free USDC balance** to their own
+  wallet immediately. No price feed, relayer or delayed withdrawal request is needed.
+- The exchange owner approves a replacement with `setMigrationTarget(target)`. It must be a
+  contract using the same USDC. After approval, `migrateBalance(user, amount)` moves that user's
+  free balance into `target.depositFor(user, amount)`. Anyone can submit it; the recipient is
+  always the same user. Actual token movement and exact account credit are checked atomically.
+- Only the exchange owner can move house cash with `migrateHouse(amount)`. Open cash margin,
+  queue-funded margin and unpaid winnings must all be settled first. User balances and accrued
+  staker/team fees remain reserved in the source contract.
+- A repair uses the upgrade owner's `upgrade(implementation, initialization)`. Entering recovery
+  sets the existing opens pause; the exchange owner must explicitly unpause after a repair.
+
+Open positions and unpaid queue claims are preserved during recovery. They do not become free
+USDC merely because the exchange paused. Repair the implementation and settle them before a
+complete migration; recovery does not invent prices, forgive claims or transfer other users'
+margin. Review the replacement, including its upgrade control. The target code-hash check
+detects a changed runtime; it does not freeze an upgradeable destination's implementation.
+
+Run `npm run test:hybrid` to build isolated artifacts, enforce the stored compatibility baseline
+and test recovery. `script/DeployHybrid.s.sol` prepares a separate, initially paused core using the
+current collateral, pricing and sessions. Build standard supporting-contract artifacts with
+`node tools/deployable.mjs --forge`, then hybrid artifacts with
+`node tools/deployable.mjs --hybrid --forge`. Simulate with the fast profile and its output/cache
+directories. The script requires explicit `HYBRID_DEPLOYER`, `HYBRID_OWNER`,
+`HYBRID_UPGRADE_OWNER`, `HYBRID_GUARDIAN` and `HYBRID_FEE_RECIPIENT` addresses. Its candidate
+record is separate from `deployments/1.json`; simulation does not prove live deployment.
+
+`tools/hybrid-admin.mjs` inspects a deployed candidate or prepares unsigned, simulated `pause`,
+`evacuate`, `target`, `migrate`, `withdraw`, `house` and `upgrade` transactions:
+
+```sh
+node tools/hybrid-admin.mjs inspect --deployment deployments/1-hybrid-candidate.json
+node tools/hybrid-admin.mjs pause --from GUARDIAN_ADDRESS
+node tools/hybrid-admin.mjs evacuate --from GUARDIAN_ADDRESS
+node tools/hybrid-admin.mjs target --from OWNER_ADDRESS --target REPLACEMENT_ADDRESS
+node tools/hybrid-admin.mjs migrate --from SUBMITTER_ADDRESS --user CUSTOMER_ADDRESS --amount 100
+node tools/hybrid-admin.mjs withdraw --from CUSTOMER_ADDRESS --amount 100
+```
+
+The tool never signs or broadcasts. Upgrades also require reviewed source, verified deployment
+bytecode and a rehearsal against actual state; simulation and the local layout check alone cannot
+validate arbitrary deployed code. New pairs use `listMarket` on the proxy, then a controlled
+price-service restart to subscribe to the feed.
+
 The Ethereum core is deployed. The public address record is
 [`deployments/1.json`](deployments/1.json); the coin and reward contracts remain undeployed.
 
 | Contract | Ethereum address |
 | --- | --- |
-| FastExchange | `0x06FDA5DF6C1a8BbC24bF4A2E717302163E23b062` |
+| Exchange proxy (FastExchange logic) | `0xeC35098521Cfc3B4F262FEE9c19603658019DF3C` |
+| FastExchange implementation | `0x162Ff8b2cD2CEe7AFd12Dc907c0910Da918b6028` |
+| Upgrade controller | `0xDefFD8B323d2A99e9B4C2A0E4d178FEbdE120AD5` |
+| Emergency implementation | `0xb21ba547b0F801bCe1c3732317B4d38F71CbBb85` |
 | Pricing | `0xd170144B7b2F6B3423Ac5974F29c1FED4759Cf93` |
-| ExecutionOracle | `0x3c6dcFbcCD0deB7b682492ac89CAB6cCE6538055` |
+| ExecutionOracle | `0x55fF6BFF62DAa08Fe4861B0b9E1D2e2E256498FE` |
 | Sessions | `0x2d1dd1980c050E509042Fee55B91184c3979940F` |
-| Lens | `0x91490008aa27Be3988B109D22b666537e703F89E` |
-| Gateway | `0x54f7c8DFAaB564957d53f0ecfBa8EdD9F6C8070C` |
-| Batcher | `0x42883d81D4CC1c541B7B728cCd103BC40F35A799` |
-| Deposits | `0x937292c6D7F8dB3784c91cE8DFaa6F8352224Ceb` |
+| Lens | `0x0714b510E3216785A5DbcD0e0888c025F1F4d2ac` |
+| Gateway | `0xf7881C67827449719924720f39b176B7dB07F930` |
+| Batcher | `0x1ed370B476d56B3F8e04C153f95444fdEC19DC89` |
+| Deposits | `0x2D037FC23E83fACB09a67f6c0BE0Ec03B8485582` |
 
 The current deployment uses `executionMode: "order-bound"`. Orders receive a fresh signed price
 after intake, without the original exchange's fixed two-second wait. Ethereum confirmation still
 takes time. Pricing and Sessions are reused; the exchange, oracle and four periphery contracts are new.
-`/v2` serves the current API. The original exchange remains available at `/v1` and
-`/trade?legacy=1` for withdrawals. Balances stay in their original contract until their owner withdraws.
+`/v3` serves the current API. Both prior exchanges remain available at `/v1` and `/v2`,
+with `/trade?legacy=1` and `/trade?legacy=2` for withdrawals. Balances stay in their original contract until their owner withdraws.
 
 `script/Deploy.s.sol` and `script/DeployDeposits.s.sol` build the original delayed variant, useful
 for local development. They do not reproduce the current FastExchange deployment.
 `script/AttachCoin.s.sol` is a separate, optional operation and must not be run when deploying only
-the trading platform. No coin is attached to either exchange.
+the trading platform. No coin is attached to any live exchange.
 
 ## Architecture
 
@@ -90,7 +154,7 @@ updates instead; see "Trust" for what the difference is.
 
 | Contract | What it does |
 | --- | --- |
-| `Exchange.sol` | Balances, positions, settlement, fees, the payout queue. Not upgradeable, and no function touches a trader's balance. |
+| `Exchange.sol` | Balances, positions, settlement, fees and payout queue. The current deployment runs this logic behind the upgradeable hybrid proxy. |
 | `FastExchange.sol` | Current exchange. Extends Exchange with no fixed execution wait, signed prices bound to each order, and millisecond ordering of entry and subsequent prices. |
 | `base/Intents.sol` | The EIP-712 orders traders sign: `Open`, `Close`, `Withdraw`. An open carries the worst price and the largest size charge it will accept. |
 | `Sessions.sol` | Session keys for one-click trading. A key can trade and can never withdraw. |
@@ -403,11 +467,13 @@ nothing else to adjust.
 
 | Role | Can | Cannot |
 | --- | --- | --- |
-| Owner | List markets, set operators, guardian and dev recipient, set the caps on open interest and each market's depth, the smallest margin and position, attach the coin once, lift a pause; everything the guardian can | Change fees, the rest of a listed market's pricing, the terms of an open position, the staker share or the staker cap; move anyone's funds; upgrade |
+| Owner | List markets, set operators, guardian and dev recipient, set the caps on open interest and each market's depth, the smallest margin and position, attach the coin once, lift a pause; everything the guardian can | Change fees, the rest of a listed market's pricing, the terms of an open position, the staker share or the staker cap; move anyone's funds through these ordinary admin functions. Upgrade authority is a separate trusted role below. |
 | Operator | Submit signed orders and signed withdrawals, liquidate and execute direct closes at once, sweep house cash above the cap to stakers (within the Sweeper's mark) | Forge an order, choose a price, move funds to anyone but the staking contract, decide who can trade |
-| Guardian | Pause new positions, retire a market at a price no older than 60 s | Unpause, touch funds |
+| Guardian | Pause new positions, retire a market at a price no older than 60 s; evacuate USDC to the source-bound rescue vault during recovery | Unpause trading or redirect user withdrawals |
 | Price signer | Sign prices. Every fill, close and bust is at a price it signed. | Send a transaction, move funds, submit an order. But see below: whoever holds it decides what every position is worth. |
 | Anyone | Liquidate and execute a direct close (after the waits above, with the price signer's print for that moment), pay the queue, push staker fees, send dev fees to their recipient, donate to the house | |
+
+The live hybrid deployment also has an **upgrade owner**, which can replace the implementation and therefore change fund handling. Its recovery guardian can immediately install only the precommitted emergency implementation. The current owner wallet holds these roles; no upgrade timelock is configured.
 
 **The price signer's key is the first trust in this system.** `ExecutionOracle` accepts a price for
 one reason: that key signed it. It cannot tell a true price from a false one, and there is no
@@ -677,4 +743,3 @@ What to know before using it:
 Tape's code is released under the [MIT license](LICENSE). Dependencies and bundled fonts retain
 their own licenses. See [CONTRIBUTING.md](CONTRIBUTING.md) for development checks and
 [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
-

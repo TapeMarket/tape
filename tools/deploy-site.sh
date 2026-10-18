@@ -20,7 +20,7 @@ npm run build
 
 # The site may only talk to itself, the preview's price feed, and its relayer. If the relayer is
 # somewhere other than api.tapemarket.io, the security policy has to name that origin instead.
-API_URL="${VITE_API_URL:-https://api.tapemarket.io/v2}"
+API_URL="${VITE_API_URL:-https://api.tapemarket.io/v3}"
 API_SCHEME="${API_URL%%://*}"
 API_HOST="${API_URL#*://}"
 API_HOST="${API_HOST%%/*}"

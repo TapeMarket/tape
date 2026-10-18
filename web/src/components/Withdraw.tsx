@@ -17,19 +17,20 @@ export default function WithdrawDialog() {
   const owner = useStore(s => s.owner);
   const account = useStore(s => s.account);
   const config = useStore(s => s.config);
+  const emergency = config?.recovery?.paused && config.recovery.available;
   const offline = useStore(s => s.offline);
   const slot = owner?.toLowerCase() ?? "";
   const flow = useStore(s => s.withdrawFlows[slot]);
   const [text, setText] = useState(flow?.stage === "error" ? depositAmount(flow.amount) : "");
   const [watchError, setWatchError] = useState(false);
   const lock = useRef(false), id = useId();
-  const free = big(account?.balance) - big(account?.reserved);
+  const free = big(account?.balance) - (emergency ? 0n : big(account?.reserved));
   const max = free > 0n ? free : 0n;
   const amount = parseUsd(text);
   const busy = withdrawActive(flow?.stage);
   const complete = flow?.stage === "complete";
   const issue = !account ? "Loading your available balance…" : amount !== null && amount > max ? "This is more than your available balance." : max === 0n ? "Close a position or add funds to make USDC available." : null;
-  const disabled = busy || !!offline || !owner || !account || !amount || amount > max;
+  const disabled = busy || !!offline || config?.recovery?.available === false || !owner || !account || !amount || amount > max;
   const network = PREVIEW ? "Practice funds" : config?.chainId === 1 ? "Ethereum" : "Local test network";
   const close = () => {
     if (complete) setState(s => ({ withdrawFlows: { ...s.withdrawFlows, [slot]: undefined } }));
@@ -72,11 +73,11 @@ export default function WithdrawDialog() {
       <div className="deposit-stamp"><img src="/img/usdc.png" width="40" height="40" alt="" /></div>
       <h3>{flow.stage === "preparing" ? "Checking your balance." : flow.stage === "wallet" ? "Confirm in your wallet." : flow.stage === "pending" ? "Checking your withdrawal." : PREVIEW ? "Returning your funds." : "Confirming on Ethereum."}</h3>
       <p className="deposit-moving">{depositAmount(flow.amount)} USDC</p>
-      <ol className="deposit-steps" aria-label="Withdrawal stages">{(PREVIEW ? ["Trading balance", "Practice wallet"] : ["Wallet signature", "Ethereum confirmation", "Your wallet"]).map((step, index) => {
+      <ol className="deposit-steps" aria-label="Withdrawal stages">{(PREVIEW ? ["Trading balance", "Practice wallet"] : [emergency ? "Wallet transaction" : "Wallet signature", "Ethereum confirmation", "Your wallet"]).map((step, index) => {
         const current = flow.stage === "preparing" || flow.stage === "wallet" ? 0 : 1;
         return <li key={step} className={index < current ? "done" : index === current ? "current" : ""} aria-current={index === current ? "step" : undefined}><span>{index < current ? <Arrow check /> : <i />}</span>{step}</li>;
       })}</ol>
-      <p className="deposit-help">{flow.stage === "wallet" ? "Sign only this withdrawal to your connected wallet. The relayer pays the gas." : flow.stage === "pending" ? flow.error : "You can close this window. Reopen Withdraw to check the same transfer."}</p>
+      <p className="deposit-help">{flow.stage === "wallet" ? emergency ? "Confirm a direct withdrawal to your wallet. Your wallet pays Ethereum gas." : "Sign only this withdrawal to your connected wallet. The relayer pays the gas." : flow.stage === "pending" ? flow.error : "You can close this window. Reopen Withdraw to check the same transfer."}</p>
       {watchError && <p className="deposit-feedback" role="status">Status is temporarily unavailable. Checking again automatically.</p>}
       <button className="btn deposit-primary" onClick={close}>Close</button>
     </section> : <>
@@ -89,7 +90,7 @@ export default function WithdrawDialog() {
       <p id={`${id}-help`} className={`deposit-amount-help ${issue && text ? "invalid" : ""}`} aria-live="polite">{issue ?? "Withdraw any available amount. No withdrawal fee."}</p>
       {flow?.stage === "error" && <p className="deposit-feedback invalid" role="alert">{flow.error}</p>}
       <div className="withdraw-destination"><span>To your connected wallet</span><strong>{owner ?? "Connect a wallet"}</strong></div>
-      <dl className="deposit-receipt"><div><dt>You receive</dt><dd>{amount ? depositAmount(amount) : "0.00"} USDC</dd></div><div><dt>Network fee</dt><dd>{PREVIEW ? "None in practice" : "Paid by the relayer"}</dd></div><div><dt>Available after withdrawal</dt><dd>{depositAmount(amount && amount <= max ? max - amount : max)} USDC</dd></div></dl>
+      <dl className="deposit-receipt"><div><dt>You receive</dt><dd>{amount ? depositAmount(amount) : "0.00"} USDC</dd></div><div><dt>Network fee</dt><dd>{PREVIEW ? "None in practice" : emergency ? "Paid by your wallet" : "Paid by the relayer"}</dd></div><div><dt>Available after withdrawal</dt><dd>{depositAmount(amount && amount <= max ? max - amount : max)} USDC</dd></div></dl>
       <button className="btn primary deposit-primary" disabled={disabled} onClick={async () => {
         if (disabled || !amount || lock.current) return;
         lock.current = true;

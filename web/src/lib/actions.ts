@@ -20,7 +20,7 @@ import { withdrawActive, type WithdrawFlow } from "./withdraw-flow";
 import { INTENT_STALE_AFTER, recordIntent } from "./open-orders";
 import { pendingReferral, referralMessage, settleReferral } from "./referral";
 import { REFERRAL_CODE_RULE, referralCodeMessage } from "@shared/referral-code.mjs";
-import type { Account, Address, Hex, History, Intent } from "./types";
+import type { Account, Address, Config, Hex, History, Intent } from "./types";
 import { coin as coinText, usdExact } from "./format";
 
 import stakingAbi from "../../../abi/Staking.json";
@@ -556,10 +556,21 @@ export async function withdraw(amount: bigint): Promise<boolean> {
   try {
     const [fresh, history] = await Promise.all([get<Account>(`/account/${owner}`), get<History>(`/history/${owner}?limit=200`)]);
     stillConnected();
-    if (amount > BigInt(fresh.balance) - BigInt(fresh.reserved)) throw Error("This is more than your available balance. Choose a smaller amount.");
+    const recovery = getState().config?.recovery ? (await get<Config>("/config")).recovery : undefined;
+    stillConnected();
+    if (recovery && !recovery.available) throw Error("Exchange status is unavailable. Wait for recovery status to reconnect.");
+    if (amount > BigInt(fresh.balance) - (recovery?.paused ? 0n : BigInt(fresh.reserved))) throw Error("This is more than your available balance. Choose a smaller amount.");
     progress({ baseline: history.transfers });
     let result: { tx?: Hex };
-    if (PREVIEW) {
+    if (recovery?.paused) {
+      progress({ stage: "wallet" });
+      const config = getState().config!;
+      const tx = await signer.write({ address: config.addresses.exchange, abi: [{ type: "function", name: "emergencyWithdraw", stateMutability: "nonpayable", inputs: [{ name: "amount", type: "uint256" }], outputs: [] }], functionName: "emergencyWithdraw", args: [amount] }, hash => {
+        submitted = true;
+        progress({ stage: "confirming", tx: hash });
+      });
+      result = { tx };
+    } else if (PREVIEW) {
       progress({ stage: "submitting" }); submitted = true;
       result = await post("/withdraw", { owner, to: owner, amount });
     }
@@ -583,7 +594,7 @@ export async function withdraw(amount: bigint): Promise<boolean> {
     return true;
   } catch (error) {
     const message = error instanceof ApiError ? error.message : explainWalletError(error);
-    if (submitted && (!(error instanceof ApiError) || error.status >= 500)) {
+    if (submitted && !(error as { transactionReverted?: boolean })?.transactionReverted && (!(error instanceof ApiError) || error.status >= 500)) {
       progress({ stage: "pending", error: "The response was interrupted. Checking your withdrawal before allowing another submission." });
       return false;
     }

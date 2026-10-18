@@ -27,6 +27,7 @@ import { createJackpot } from "./jackpot.mjs";
 import { createHub, createLogger } from "./util.mjs";
 import { EXEC_DELAY, PIN_WINDOW, INTENT_TTL, DIRECT_DELAY, WITHDRAW_DELAY, GRACE, REQUEST_EXPIRY } from "../../shared/eip712.mjs";
 import { FEE_BPS } from "../../shared/math.mjs";
+import { refreshRecovery } from "./recovery.mjs";
 
 /** The Exchange's own rules, as the code in shared/ assumes them. Checked against the contract at start. */
 const RULES = { EXEC_DELAY, PIN_WINDOW, INTENT_TTL, DIRECT_DELAY, WITHDRAW_DELAY, GRACE, REQUEST_EXPIRY, FEE_BPS, MAX_OPEN_POSITIONS: 200, STAKER_SHARE_BPS: 5_000 };
@@ -34,6 +35,7 @@ const RULES = { EXEC_DELAY, PIN_WINDOW, INTENT_TTL, DIRECT_DELAY, WITHDRAW_DELAY
 const log = createLogger();
 const config = loadConfig();
 const chain = createChain(config);
+await refreshRecovery({ config, chain });
 
 const actualChainId = await chain.publicClient.getChainId();
 if (actualChainId !== config.chainId) {
@@ -82,6 +84,7 @@ if (chain.operators.length > 1) log.info(`gas: ${chain.operators.length} operato
 // The timing rules live in the contract and, as plain numbers, in shared/ (the site prices and
 // stamps orders with them too). They have to be the same numbers.
 for (const [name, expected] of Object.entries(RULES)) {
+  if (name === "EXEC_DELAY" && config.recoveryState?.paused) continue;
   const actual = await chain.read("exchange", name);
   const rule = name === "EXEC_DELAY" && orderBound ? 0 : expected;
   if (BigInt(actual) !== BigInt(rule)) {
