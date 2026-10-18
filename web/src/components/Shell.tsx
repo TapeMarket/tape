@@ -19,7 +19,6 @@ export { Link } from "./Link";
 
 const MORE: [string, string][] = [
   ["/dashboard", "Dashboard"],
-  ["/referrals", "Referrals"],
   ["/docs", "Docs"],
   ["/status", "Status"],
 ];
@@ -153,6 +152,7 @@ export function TopBar() {
           {coin && <Link to="/staking">{tx("Staking")}</Link>}
           <Link to="/leaderboard">{tx("Leaderboard")}</Link>
           <Link to="/stats">{tx("Stats")}</Link>
+          <Link to="/referrals">{tx("Referrals")}</Link>
           <Popover
             align="right"
             className={inMore ? "on" : ""}
@@ -223,7 +223,7 @@ export function TopBar() {
         {coin && (<Link to="/staking"><Localized message={"{0}Staking"} values={[<Glyph name="coin" />]} /></Link>)}
         <Popover
           align="up"
-          className={inMore || path === "/leaderboard" || path === "/stats" || path === "/jackpot" ? "on" : ""}
+          className={inMore || path === "/leaderboard" || path === "/stats" || path === "/jackpot" || path === "/referrals" ? "on" : ""}
           label={
             <>
               <Glyph name="more" />
@@ -233,6 +233,7 @@ export function TopBar() {
           <Link to="/jackpot">{tx("Jackpot")}</Link>
           <Link to="/leaderboard">{tx("Leaderboard")}</Link>
           <Link to="/stats">{tx("Stats")}</Link>
+          <Link to="/referrals">{tx("Referrals")}</Link>
           <MoreItems />
         </Popover>
       </nav>
