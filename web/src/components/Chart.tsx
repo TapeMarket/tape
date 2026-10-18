@@ -14,8 +14,9 @@ import type { Position } from "../lib/types";
 // the chart flat, so it is left off the scale.
 /** The most points the price line holds: an hour of one-second prints. */
 const KEEP_POINTS = 3_600;
-/** How many of the most recent points the line of prints opens on: several minutes, not a screenful of seconds. */
+/** The stepped line keeps its wider view; Tick opens on roughly the last 90 seconds. */
 const OPEN_ON_POINTS = 480;
+const OPEN_ON_TICKS = 90;
 const KEEP_RANGES = 2.5;
 const KEEP_ALWAYS = 0.0009;
 
@@ -68,6 +69,7 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
   const previewRef = useRef<IPriceLine | null>(null);
   const zonesRef = useRef<Zone[]>([]);
   const lastRef = useRef<number>(0);
+  const resetViewRef = useRef<(() => void) | null>(null);
   const [boxes, setBoxes] = useState<Box[]>([]);
 
   const positions = useStore((s) => s.account?.positions) ?? EMPTY;
@@ -157,8 +159,8 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
         : chart.addAreaSeries({
             lineColor: "#1640ff",
             lineWidth: 2,
-            lineType: LineType.WithSteps,
-            lastPriceAnimation: LastPriceAnimationMode.Continuous,
+            lineType: LineType.Simple,
+            lastPriceAnimation: matchMedia("(prefers-reduced-motion: reduce)").matches ? LastPriceAnimationMode.Disabled : LastPriceAnimationMode.OnDataUpdate,
             topColor: "rgba(22, 64, 255, 0.14)",
             bottomColor: "rgba(22, 64, 255, 0.01)",
             ...shared,
@@ -297,6 +299,14 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
     let live: Point[] = [];
     let fetchingOlder = false;
     let reachedTheStart = false;
+    let pointCount = 0;
+    let touched = false;
+    let motionFrame: number | null = null;
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const stopMotion = () => {
+      if (motionFrame !== null) cancelAnimationFrame(motionFrame);
+      motionFrame = null;
+    };
     const all = (): Point[] => {
       const latest = getState().ticks[marketId];
       const from = live.length ? live[0].time : localTime(step(latest?.t ?? Math.floor(Date.now() / 1000)));
@@ -305,7 +315,12 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
       const closes = history.map((bar) => ({ time: localTime(bar.time + 59), value: bar.close })).filter((pt) => pt.time < from);
       return [...closes, ...live];
     };
-    const redraw = () => series.setData(all());
+    const redraw = () => {
+      stopMotion();
+      const points = all();
+      pointCount = points.length;
+      series.setData(points);
+    };
 
     const push = (t: number, p: bigint) => {
       if (!alive) return;
@@ -313,27 +328,51 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
       lastTime = step(t);
       lastRef.current = priceNumber(p);
       const point = { time: localTime(lastTime), value: lastRef.current };
-      if (live.length && live[live.length - 1].time === point.time) live[live.length - 1] = point;
-      else live.push(point);
+      const appended = !live.length || live[live.length - 1].time !== point.time;
+      const scale = chart.timeScale();
+      const view = appended && !touched ? scale.getVisibleLogicalRange() : null;
+      const follow = interval === 0 && view && pointCount > 0 && view.to >= pointCount - 1;
+      if (!appended) live[live.length - 1] = point;
+      else { live.push(point); pointCount++; }
       if (live.length > KEEP_POINTS * 1.5) {
         live = live.slice(-KEEP_POINTS);
         redraw();
-      } else series.update(point);
+      } else {
+        // Prices update immediately and exactly. Only the viewport moves between frames.
+        series.update(point);
+        if (follow && !reducedMotion.matches && !document.hidden) {
+          stopMotion();
+          const target = scale.getVisibleLogicalRange();
+          if (target) {
+            scale.setVisibleLogicalRange(view);
+            const started = performance.now();
+            const move = (now: number) => {
+              const progress = Math.min(1, (now - started) / 160);
+              const eased = 1 - Math.pow(1 - progress, 3);
+              scale.setVisibleLogicalRange({ from: view.from + (target.from - view.from) * eased, to: view.to + (target.to - view.to) * eased });
+              scheduleLayout();
+              motionFrame = progress < 1 && !document.hidden ? requestAnimationFrame(move) : null;
+            };
+            motionFrame = requestAnimationFrame(move);
+          }
+        }
+      }
       scheduleLayout();
     };
 
     // The view follows the latest stretch as data arrives, until the reader scrolls or zooms it.
-    let touched = false;
-    const touch = () => (touched = true);
+    const touch = () => { touched = true; stopMotion(); };
     const box = holder.current;
     box?.addEventListener("wheel", touch, { passive: true });
     box?.addEventListener("pointerdown", touch);
     const open = () => {
       const scale = chart.timeScale();
       const count = all().length;
-      if (count > OPEN_ON_POINTS) scale.setVisibleLogicalRange({ from: count - OPEN_ON_POINTS, to: count + 14 });
+      const window = interval === 0 ? OPEN_ON_TICKS : OPEN_ON_POINTS;
+      if (count > window) scale.setVisibleLogicalRange({ from: count - window, to: count + 14 });
       else scale.fitContent();
     };
+    resetViewRef.current = () => { touched = false; stopMotion(); open(); };
 
     // Whatever arrives is drawn as it arrives; any minute closes fetched on an earlier visit or
     // while hovering this market appear immediately, without waiting for another request.
@@ -398,6 +437,8 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
     });
     return () => {
       alive = false;
+      stopMotion();
+      resetViewRef.current = null;
       off();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(older);
       box?.removeEventListener("wheel", touch);
@@ -488,8 +529,11 @@ export function Chart({ marketId, interval = 0 }: { marketId: number; interval?:
         onClick={() => {
           const chart = chartRef.current;
           if (!chart) return;
-          chart.timeScale().resetTimeScale();
-          chart.timeScale().scrollToRealTime();
+          if (resetViewRef.current) resetViewRef.current();
+          else {
+            chart.timeScale().resetTimeScale();
+            chart.timeScale().scrollToRealTime();
+          }
           chart.priceScale("right").applyOptions({ autoScale: true });
         }}
       >

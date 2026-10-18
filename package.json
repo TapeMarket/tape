@@ -8,6 +8,7 @@
     "test:fast": "node tools/deployable.mjs --fast --forge && forge test --match-contract FastExchangeTest",
     "test:migration-ui": "node web/e2e/exchange-migration.mjs",
     "test:balance-ui": "node web/e2e/account-balance.mjs",
+    "test:chart-ui": "node web/e2e/chart-motion.mjs",
     "test:fork": "FORK=true forge test --match-contract ForkTest -vv",
     "test:invariant": "FOUNDRY_INVARIANT_RUNS=200 FOUNDRY_INVARIANT_DEPTH=150 forge test --match-contract InvariantTest",
     "test:deployable": "node tools/deployable.mjs && DEPLOYABLE=true forge test",
