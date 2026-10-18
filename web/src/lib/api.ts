@@ -120,7 +120,11 @@ export async function loadConfig(): Promise<void> {
     const received = await get<Config>("/config");
     // A new relayer's oldest sample is not a 24-hour reference. Live pages load the venue's
     // actual daily baseline independently, just as the practice feed does.
-    const config = PREVIEW ? received : { ...received, markets: received.markets.map((market) => ({ ...market, ref24h: null })) };
+    const previous = getState().config;
+    const config = PREVIEW ? received : { ...received, markets: received.markets.map((market) => {
+      const known = previous?.markets.find(old => old.id === market.id && old.symbol === market.symbol && old.feedId === market.feedId);
+      return { ...market, ref24h: known?.ref24h ?? null };
+    }) };
     // Halve the round trip to estimate when the relayer read its clock.
     const clockOffset = config.time + (Date.now() - sent) / 2 - Date.now();
     const ticks: Record<number, Tick> = { ...getState().ticks };
@@ -255,9 +259,13 @@ function handle(type: string, data: unknown): void {
   switch (type) {
     case "hello":
       // The first thing a stream says, each time it is opened. After a break, what happened in
-      // between (a fill, a bust) was not heard: read the account again.
-      if (getState().offline) refreshAccountSoon();
+      // between includes configuration changes (coin attachment, new pairs and pauses). EventSource
+      // onopen already clears offline, so it cannot be used to decide whether to refresh.
       setState({ clockOffset: (data as { time: number }).time - Date.now(), offline: null });
+      void loadConfig().then(() => {
+        refreshAccountSoon(0);
+        return loadCoin();
+      }).catch(() => { /* Keep the visible connection error and retry on the next connection. */ });
       break;
     case "tick": {
       const { m, t, p } = data as { m: number; t: number; p: string };
@@ -331,7 +339,13 @@ function handle(type: string, data: unknown): void {
       break;
     case "house": {
       const house = data as HousePayload["house"];
-      setState((s) => (s.house ? { house: { ...s.house, house } } : {}));
+      setState((s) => {
+        const paused = s.config?.recovery && (!s.config.recovery.available || s.config.recovery.paused) ? true : house.opensPaused;
+        return {
+          ...(s.house ? { house: { ...s.house, house } } : {}),
+          ...(s.config && s.config.opensPaused !== paused ? { config: { ...s.config, opensPaused: paused } } : {}),
+        };
+      });
       break;
     }
     default:

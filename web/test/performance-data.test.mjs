@@ -27,6 +27,47 @@ function fixture(t) {
   return { ...module.exports, requests };
 }
 
+test("stream reconnect refreshes new coin configuration and account even after onopen cleared offline", async t => {
+  const f = await streamFixture(t);
+  f.setState({ owner, account: account(), config: { time: Date.now(), markets: [], addresses: {}, coin: null }, coin: { attached: false }, offline: null });
+  f.emit("hello", { time: Date.now() }); await flush();
+  assert.equal(f.requests[0].url.pathname, "/config");
+  const address = "0x2000000000000000000000000000000000000002";
+  f.requests[0].reply({ time: Date.now(), markets: [], addresses: { coin: address, staking: address }, coin: { address, symbol: "TAPE" }, opensPaused: true });
+  await flush();
+  const coin = f.requests.find(r => r.url.pathname === "/coin");
+  assert.ok(coin); coin.reply({ attached: true, address, symbol: "TAPE" }); await flush();
+  t.mock.timers.tick(1); await flush();
+  const freshAccount = f.requests.find(r => r.url.pathname === `/account/${owner}`);
+  assert.ok(freshAccount, "account refresh must not depend on the already-cleared offline flag");
+  freshAccount.reply({ ...account(), coin: { wallet: "100" } }); await flush();
+  assert.equal(f.getState().config.addresses.staking, address);
+  assert.equal(f.getState().coin.attached, true);
+  assert.equal(f.getState().account.coin.wallet, "100");
+  assert.ok(f.requests.every(r => !r.init?.method || r.init.method === "GET"));
+});
+
+test("ordinary pause and resume reach an open tab through house events without clearing emergency recovery", async t => {
+  const f = await streamFixture(t);
+  f.setState({ config: { opensPaused: false, addresses: {} } });
+  f.emit("house", { opensPaused: true }); assert.equal(f.getState().config.opensPaused, true);
+  f.emit("house", { opensPaused: false }); assert.equal(f.getState().config.opensPaused, false);
+  f.setState({ config: { opensPaused: true, recovery: { available: true, paused: true } } });
+  f.emit("house", { opensPaused: false }); assert.equal(f.getState().config.opensPaused, true);
+  f.setState({ config: { opensPaused: true, recovery: { available: false, paused: false } } });
+  f.emit("house", { opensPaused: false }); assert.equal(f.getState().config.opensPaused, true);
+});
+
+test("a failed reconnect configuration fetch retains known addresses and reports the failure without writes", async t => {
+  const f = await streamFixture(t);
+  f.setState({ config: { addresses: { coin: "known" }, markets: [] }, coin: { attached: false } });
+  f.emit("hello", { time: Date.now() }); await flush();
+  f.requests[0].reply({ error: "Restarting" }, 503); await flush();
+  assert.equal(f.getState().config.addresses.coin, "known");
+  assert.equal(f.getState().offline, "Restarting");
+  assert.equal(f.requests.length, 1);
+});
+
 test("simultaneous public reads share a request; subsequent refreshes and different queries stay fresh", async (t) => {
   const f = fixture(t);
   const a = f.loadPrices(0, 3600), b = f.loadPrices(0, 3600), c = f.loadPrices(1, 3600);
@@ -64,6 +105,16 @@ test("configuration consumers do not mutate the shared server response", async (
   assert.equal(f.requests.length, 1); f.requests[0].reply(snapshot); await loaded;
   assert.equal((await raw).markets[0].ref24h, 12);
   assert.equal(f.getState().config.markets[0].ref24h, null);
+});
+
+test("reconnect keeps the venue daily baseline for the same feed and drops it for a replaced market", async t => {
+  const f = fixture(t);
+  f.setState({ config: { markets: [{ id: 0, symbol: "BTC", feedId: "btc", ref24h: 80_000 }, { id: 1, symbol: "ETH", feedId: "eth", ref24h: 2_400 }] } });
+  const loaded = f.loadConfig(); await flush();
+  f.requests[0].reply({ time: Date.now(), markets: [{ id: 0, symbol: "BTC", feedId: "btc", ref24h: 1 }, { id: 1, symbol: "SOL", feedId: "sol", ref24h: 1 }] });
+  await loaded;
+  assert.equal(f.getState().config.markets[0].ref24h, 80_000);
+  assert.equal(f.getState().config.markets[1].ref24h, null);
 });
 
 const candles = [{ t: 60_000, o: "10", h: "12", l: "9", c: "11" }];

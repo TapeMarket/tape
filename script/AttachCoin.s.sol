@@ -205,6 +205,17 @@ contract AttachCoin is Script {
             }
         }
 
+        if (launchCoin) {
+            // Do this AFTER every CREATE so the reviewed token address is unchanged. Keep new
+            // positions paused until the pool, all launch buys and the backend coin record are
+            // verified. Otherwise a settled loss could spend the launch reserve before the LP
+            // transaction and invalidate its full-reserve preflight.
+            exchange.pauseOpens();
+            require(
+                exchange.totalCashMargin() == 0 && exchange.debtMarginOpen() == 0,
+                "open positions remain: settle them before attaching a launch coin"
+            );
+        }
         exchange.attachCoin(address(staking), address(mining), address(sweeper));
         vm.stopBroadcast();
 
@@ -242,16 +253,19 @@ contract AttachCoin is Script {
             "LaunchCoin", abi.encode(coinName, coinSymbol, supply, reserve, deployer, maxWalletBps, deployer)
         );
         address expectedCoin = vm.envOr("EXPECTED_COIN", address(0));
-        require(expectedCoin == address(0) || coin == expectedCoin, "coin address changed: review deployer nonce and transaction order");
+        require(
+            expectedCoin == address(0) || coin == expectedCoin,
+            "coin address changed: review deployer nonce and transaction order"
+        );
         LaunchCoin made = LaunchCoin(coin);
         // Constructor arguments are handed over as bytes, so nothing but this checks them.
         require(
             keccak256(bytes(made.name())) == keccak256(bytes(coinName))
-                && keccak256(bytes(made.symbol())) == keccak256(bytes(coinSymbol)) && made.totalSupply() == supply
-                && made.balanceOf(deployer) == reserve && made.balanceOf(coin) == supply - reserve
-                && made.poolSupply() == supply - reserve && made.maxWallet() == supply * maxWalletBps / 10_000
-                && made.owner() == deployer && made.limitsInEffect() == (maxWalletBps != 0)
-                && made.lpTokenId() == 0,
+                && keccak256(bytes(made.symbol())) == keccak256(bytes(coinSymbol))
+                && made.totalSupply() == supply && made.balanceOf(deployer) == reserve
+                && made.balanceOf(coin) == supply - reserve && made.poolSupply() == supply - reserve
+                && made.maxWallet() == supply * maxWalletBps / 10_000 && made.owner() == deployer
+                && made.limitsInEffect() == (maxWalletBps != 0) && made.lpTokenId() == 0,
             "the launch coin was not built with the arguments given"
         );
         // Its pool is on Uniswap v4, and its liquidity is locked in UNCX's locker, at fixed
