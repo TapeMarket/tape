@@ -3439,9 +3439,9 @@ p {
 .band-b {
   top: 128px;
   background: #fff;
-  color: var(--ink);
+  color: var(--blue);
   transform: rotate(3deg);
-  box-shadow: inset 0 2px 0 var(--ink), inset 0 -2px 0 var(--ink), 0 18px 40px -24px rgba(10, 22, 56, 0.5);
+  box-shadow: inset 0 1px 0 rgba(22, 64, 255, 0.3), inset 0 -1px 0 rgba(22, 64, 255, 0.3), 0 18px 40px -24px rgba(10, 22, 56, 0.3);
   animation: unroll-r 1.3s 0.85s cubic-bezier(0.75, 0, 0.2, 1) both;
 }
 
@@ -3514,6 +3514,22 @@ p {
 
 .band-a .band-item {
   color: #fff;
+}
+
+.band-b .band-item {
+  font-family: "Manrope", var(--ui);
+  font-size: clamp(16px, 1.65vw, 24px);
+  font-weight: 750;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.band-b .band-item::after {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  opacity: 0.55;
+  transform: none;
 }
 
 /* The numbers */
