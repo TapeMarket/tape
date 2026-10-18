@@ -162,10 +162,15 @@ export function Landing() {
               <span>{listed.length ? `Trade ${listed.length} markets.` : "Trade global markets."}</span>
               <span>Up to <em>{leverage}x</em>.</span>
             </h1>
-            <p className="rise" style={delay(0.3)}>
-              Crypto, stocks, gold and the S&amp;P 500. 0 market impact on underlying prices.
-              Fully onchain USDC settlement on Ethereum. No opening fee or funding. Leverage varies by market.
-            </p>
+            <div className="lp-hero-description rise" style={delay(0.3)}>
+              <p className="lp-hero-markets">Crypto, stocks, gold and the S&amp;P 500.</p>
+              <ul className="lp-hero-benefits" role="list">
+                <li><strong>0 market impact</strong> on underlying prices.</li>
+                <li><strong>Fully onchain</strong> USDC settlement on Ethereum.</li>
+                <li><strong>No opening fee or funding.</strong></li>
+              </ul>
+              <p className="lp-hero-disclosure">Leverage varies by market.</p>
+            </div>
             <div className="lp-cta rise" style={delay(0.42)}>
               <Link to="/trade" className="lp-btn primary">
                 Start trading <LandingArrow />

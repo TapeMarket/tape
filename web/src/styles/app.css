@@ -6,18 +6,27 @@
  *     a grey fill. The brand blue is the top bar, the tape of prices and the one thing to press.
  *   - Colour carries meaning: green is long or profit, red is short or loss, orange is the bust line
  *     (hazard tape). Everything else is navy ink in three strengths.
- *   - One typeface, Archivo, with tabular figures everywhere so prices line up. Labels are
- *     sentence case. The wordmark is a strip of tape with the letters punched through.
+ *   - Archivo for the product and display, Manrope for the landing introduction. Tabular figures
+ *     keep prices aligned. Labels are sentence case. The wordmark is a strip of tape with the
+ *     letters punched through.
  *   - Pages are grids of panels with a 1px gap; the gap is the line.
  */
 
-/* The font is bundled with the site (SIL Open Font License): no font service, no flash. */
+/* Fonts are bundled with the site (SIL Open Font License): no font service, no flash. */
 @font-face {
   font-family: "Archivo Variable";
   font-weight: 100 900;
   font-stretch: 62% 125%;
   font-display: swap;
   src: url("../assets/fonts/archivo-latin-wdth-wght-normal.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../assets/fonts/manrope-latin-wght-normal.woff2") format("woff2");
 }
 
 :root {
@@ -3224,6 +3233,46 @@ p {
   color: var(--ink-2);
   font-size: clamp(16px, 1.25vw, 18px);
   line-height: 1.55;
+}
+
+.lp-hero-description {
+  width: 100%;
+  max-width: 50ch;
+  margin-top: 26px;
+  color: var(--ink);
+  font-family: "Manrope", var(--ui);
+  font-size: clamp(17px, 1.4vw, 20px);
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.lp-hero .lp-hero-markets {
+  max-width: none;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(20px, 1.65vw, 24px);
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.lp-hero-benefits {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-hero-benefits strong { color: var(--blue); font-weight: 700; }
+
+.lp-hero .lp-hero-disclosure {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .lp-cta {
