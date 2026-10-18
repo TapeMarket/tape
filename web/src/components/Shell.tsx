@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { claimUsername } from "../lib/actions";
 import { post } from "../lib/api";
-import { big, percent, price, priceNumber, shortAddress, usdDown, usdNumber } from "../lib/format";
+import { big, percent, price, priceNumber, shortAddress, usd, usdDown, usdNumber } from "../lib/format";
 import { BRAND, LEGACY, PREVIEW, exchangeHref } from "../lib/mode";
 import { navigate, setState, toast, useStore } from "../lib/store";
 import { connectWith, disconnect, walletOptions, type WalletOption } from "../lib/wallet";
@@ -84,6 +84,8 @@ function Quote({ id, symbol, ref24h }: { id: number; symbol: string; ref24h?: nu
 
 /** Everything under "More": the other pages, then the small print. */
 function MoreItems() {
+  const config = useStore(s => s.config);
+  const previous = config?.previousExchanges ?? (config?.previousExchange ? [config.previousExchange] : []);
   return (
     <>
       {MORE.map(([to, label]) => (
@@ -91,6 +93,10 @@ function MoreItems() {
           {label}
         </Link>
       ))}
+      {!PREVIEW && previous.length > 0 && <>
+        <hr className="menu-rule" />
+        {previous.map(deployment => <a key={deployment.address} href={deployment.siteUrl}>Previous exchange{deployment.version ? ` v${deployment.version}` : ""}</a>)}
+      </>}
       <hr className="menu-rule" />
       {/* The chart library's licence asks for this credit on the site. */}
       <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
@@ -132,8 +138,13 @@ export function TopBar() {
   const owner = useStore((s) => s.owner);
   const account = useStore((s) => s.account);
   const path = useStore((s) => s.path);
-  // Free balance: what is not already spoken for by an order on its way to the chain.
+  // Total account funds include posted margin and unpaid winnings. Cash availability is separate.
   const free = big(account?.balance) - big(account?.reserved);
+  const available = free > 0n ? free : 0n;
+  const queued = big(account?.queued);
+  const margin = big(account?.marginInUse);
+  const reserved = big(account?.reserved);
+  const balance = big(account?.balance) + margin + queued;
   const inMore = MORE.some(([to]) => to === path);
   const live = (markets ?? []).filter((m) => !m.retired);
 
@@ -175,14 +186,27 @@ export function TopBar() {
               label={
                 <>
                   <i className="wallet-dot" aria-hidden="true" />
-                  <span className="wallet-text">
-                    <b>{usdDown(free > 0n ? free : 0n)}</b>
-                    <small>{PREVIEW ? "practice" : (account?.name ?? shortAddress(owner))}</small>
+                  <span className="wallet-text" title="Total balance includes cash, margin in open positions and queued winnings.">
+                    <b aria-label={`Total balance ${account ? usd(balance) : "loading"}`}>{account ? usd(balance) : "—"}</b>
+                    {queued > 0n
+                      ? <small className="wallet-queue-label">{PREVIEW ? "practice · " : ""}{usd(queued)} queued</small>
+                      : <small>{PREVIEW ? "practice" : (account?.name ?? shortAddress(owner))}</small>}
                   </span>
                   <i className="caret" aria-hidden="true" />
                 </>
               }
             >
+              <div className="wallet-summary" role="group" aria-label="Balance breakdown">
+                <strong className="wallet-summary-owner">{account?.name ?? shortAddress(owner)}</strong>
+                <dl>
+                  <div className="wallet-summary-total"><dt>Total balance</dt><dd>{account ? usd(balance) : "—"}</dd></div>
+                  <div><dt>Available to withdraw</dt><dd>{account ? usdDown(available) : "—"}</dd></div>
+                  {margin > 0n && <div><dt>In open positions</dt><dd>{usd(margin)}</dd></div>}
+                  {reserved > 0n && <div><dt>Pending orders</dt><dd>{usd(reserved)}</dd></div>}
+                  <div><dt>Queued winnings</dt><dd>{account ? usd(queued) : "—"}</dd></div>
+                </dl>
+                {queued > 0n && <p>Queued winnings are included in your total. They become withdrawable once the vault pays them.</p>}
+              </div>
               <Link to="/portfolio">Portfolio</Link>
               {!LEGACY && <button onClick={() => setState({ dialog: "deposit" })}>Deposit</button>}
               <button onClick={() => setState({ dialog: "withdraw" })}>Withdraw</button>

@@ -15,11 +15,11 @@ import React from 'react';import{createRoot}from'react-dom/client';
 import{PreviousExchange,RecoveryBanner}from'./src/components/PreviousExchange';import{TopBar,Dialogs}from'./src/components/Shell';
 import{LEGACY,API_URL}from'./src/lib/mode';import{setState,getState}from'./src/lib/store';
 window.__set=setState;window.__get=getState;window.__api=API_URL;
-setState({owner:'${owner}',account:{address:'${owner}',balance:LEGACY?'5991':'25000000',reserved:'0',positions:[],wallet:{usdc:'0',eth:'0'}},config:{name:'Tape',chainId:1,markets:[],addresses:${JSON.stringify(deployment)},previousExchange:${JSON.stringify(deployment.previousExchange)}},path:'/trade'});
+setState({owner:'${owner}',account:{address:'${owner}',balance:LEGACY?'5991':'25000000',reserved:'0',positions:[],wallet:{usdc:'0',eth:'0'}},config:{name:'Tape',chainId:1,markets:[],addresses:${JSON.stringify(deployment)},previousExchange:${JSON.stringify(deployment.previousExchange)},previousExchanges:${JSON.stringify(deployment.previousExchanges)}},path:'/trade'});
 createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,React.createElement(TopBar),React.createElement(RecoveryBanner),React.createElement(PreviousExchange),React.createElement(Dialogs)));
 ` }, bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic', alias: { '@shared': fileURLToPath(new URL('../../shared', import.meta.url)) }, define: { 'import.meta.env': JSON.stringify({ VITE_PREVIEW: '0', VITE_API_URL: 'https://api.tapemarket.io/v2' }), __MAINNET_DEPOSITS__: 'null' }, logLevel: 'silent', plugins: [{ name: 'no-route-prefetch', setup(b) { b.onResolve({ filter: /(?:lib\/route-preload|\.\/route-preload)$/ }, () => ({ path: 'preload', namespace: 'fixture' })); b.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export function preloadRoute(){}', loader: 'js' })); } }] });
 const browser = await chromium.launch();
-const errors = [], writes = [];
+const errors = [], writes = [], reads = [];
 try {
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
   await context.route('http://tape.test/**', route => {
@@ -31,6 +31,7 @@ try {
   });
   await context.route('https://api.tapemarket.io/**', route => {
     if (route.request().method() !== 'GET') { writes.push(route.request().url()); return route.abort(); }
+    reads.push(route.request().url());
     const path = new URL(route.request().url()).pathname;
     if (path === `/v1/account/${owner}` || path === `/v2/account/${owner}`) return route.fulfill({ json: { balance: '5991', queued: '0', positions: [] } });
     return route.fulfill({ status: 503, json: { error: 'Unavailable fixture' } });
@@ -38,13 +39,16 @@ try {
   const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
   const open = async query => { await page.goto('http://tape.test/trade' + query); await page.addScriptTag({ content: result.outputFiles[0].text }); };
   await open('');
-  await page.getByText('0.005991 USDC in the previous exchange.', { exact: true }).waitFor();
+  await page.locator('.wallet-main').waitFor();
+  assert.equal(await page.locator('.banner').count(), 0);
+  assert.equal(reads.length, 0, 'Current trading no longer fetches historical account balances');
   assert.equal(await page.locator('.wallet-text b').innerText(), '$25.00');
-  assert.equal(await page.getByRole('link', { name: 'Open previous exchange' }).getAttribute('href'), deployment.previousExchange.siteUrl);
-  await page.evaluate(other => window.__set({ owner: other }), other);
-  await page.locator('.banner').filter({ hasText: 'Open it to check your remaining balance.' }).waitFor();
-  assert.equal(await page.getByText('0.005991 USDC in the previous exchange.', { exact: true }).count(), 0);
-  console.log('PASS: old funds shown separately with exact six decimals; wallet changes clear old amounts; unavailable old API leaves a recovery link.');
+  await page.locator('.top-nav').getByRole('button', { name: 'More', exact: true }).click();
+  for (const old of deployment.previousExchanges) assert.equal(await page.getByRole('link', { name: `Previous exchange v${old.version}`, exact: true }).getAttribute('href'), old.siteUrl);
+  await page.keyboard.press('Escape');
+  await page.evaluate(other => window.__set({ owner: other, account: null }), other);
+  assert.equal(await page.locator('.banner').count(), 0);
+  console.log('PASS: no automatic historical-balance banners or fetches; both withdrawal links are available in More.');
   await open('?legacy=1');
   assert.equal(await page.evaluate(() => window.__api), 'https://api.tapemarket.io/v1');
   await page.getByText('Previous exchange.', { exact: true }).waitFor();
@@ -70,8 +74,10 @@ try {
     { address: '0x3000000000000000000000000000000000000003', apiUrl: 'https://api.tapemarket.io/v1', siteUrl: '/trade?legacy=1', version: 1 },
     { address: '0x4000000000000000000000000000000000000004', apiUrl: 'https://api.tapemarket.io/v2', siteUrl: '/trade?legacy=2', version: 2 },
   ], recovery: { controller: '0x5000000000000000000000000000000000000005', paused: true, available: true, checkedAt: Date.now() } } }));
-  await page.getByRole('link', { name: 'Open previous exchange v1' }).waitFor();
-  await page.getByRole('link', { name: 'Open previous exchange v2' }).waitFor();
+  await page.locator('.top-nav').getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('link', { name: 'Previous exchange v1', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Previous exchange v2', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Withdraw USDC', exact: true }).click();
   await page.getByText('Paid by your wallet', { exact: true }).waitFor();
   await page.keyboard.press('Escape');

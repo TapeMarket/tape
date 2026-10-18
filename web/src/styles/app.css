@@ -5257,6 +5257,7 @@ p {
 
 /* The wallet: a white ticket with a notched end, and the deposit stub torn on to it. */
 .wallet {
+  position: relative;
   flex: none;
   display: flex;
   align-items: stretch;
@@ -5265,8 +5266,20 @@ p {
 }
 
 .wallet .pop {
+  position: static;
   display: flex;
 }
+
+.wallet .menu { width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 124px); overflow-y: auto; overscroll-behavior: contain; }
+.wallet-summary { margin-bottom: 4px; padding: 12px 10px; border-bottom: 1px solid var(--line); }
+.wallet-summary-owner { display: block; overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-summary dl { margin: 12px 0 0; }
+.wallet-summary dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; padding-block: 4px; }
+.wallet-summary dt { color: var(--ink-2); font-size: 12px; }
+.wallet-summary dd { margin: 0; color: var(--ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.wallet-summary-total dt { color: var(--ink); font-weight: 600; }
+.wallet-summary-total dd { font-size: 15px; }
+.wallet-summary p { margin: 10px 0 0; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
 
 .wallet-main {
   display: flex;
@@ -5307,6 +5320,8 @@ p {
   color: var(--ink-3);
   font-size: 11px;
 }
+
+.wallet-text .wallet-queue-label { color: var(--warn); }
 
 .wallet-main .caret {
   margin-left: 2px;
